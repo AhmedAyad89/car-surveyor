@@ -27,11 +27,13 @@ SCHEMA_STATEMENTS: tuple[str, ...] = (
         discovered_at TIMESTAMP NOT NULL
     )
     """,
+    # Keyed on the address: two addresses can serve the same bytes, and then
+    # share one hash and one set of files.
     """
     CREATE TABLE IF NOT EXISTS snapshots (
-        sha256 TEXT PRIMARY KEY,
+        sha256 TEXT NOT NULL,
         source_id TEXT NOT NULL,
-        url TEXT NOT NULL UNIQUE,
+        url TEXT PRIMARY KEY,
         fetch_url TEXT NOT NULL,
         route TEXT NOT NULL,
         kind TEXT NOT NULL,
@@ -167,6 +169,27 @@ def connect(database_path: Path, *, is_read_only: bool = False) -> duckdb.DuckDB
 def create_schema(connection: duckdb.DuckDBPyConnection) -> None:
     for statement in SCHEMA_STATEMENTS:
         connection.execute(statement)
+    rekey_snapshots(connection)
+
+
+def rekey_snapshots(connection: duckdb.DuckDBPyConnection) -> None:
+    """Bring a file whose `snapshots` table is keyed on the hash up to date.
+
+    The table was first keyed on the content hash, which broke when two
+    addresses served identical bytes. Its rows are copied into a table keyed
+    on the address.
+    """
+    key = connection.execute(
+        "SELECT constraint_column_names FROM duckdb_constraints() "
+        "WHERE table_name = 'snapshots' AND constraint_type = 'PRIMARY KEY'"
+    ).fetchone()
+    if key is None or list(key[0]) == ["url"]:
+        return
+    statement = next(text for text in SCHEMA_STATEMENTS if "EXISTS snapshots (" in text)
+    connection.execute(statement.replace("EXISTS snapshots (", "EXISTS snapshots_by_url ("))
+    connection.execute("INSERT INTO snapshots_by_url SELECT * FROM snapshots")
+    connection.execute("DROP TABLE snapshots")
+    connection.execute("ALTER TABLE snapshots_by_url RENAME TO snapshots")
 
 
 def fetch_records(

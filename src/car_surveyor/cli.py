@@ -206,7 +206,11 @@ def run_extract(
             return 2
         if options.export is not None:
             written = extraction.export_requests(
-                connection, settings, options.label, options.export
+                connection,
+                settings,
+                options.label,
+                options.export,
+                model_years=tuple(options.years or ()),
             )
             print(f"extract: wrote {len(written)} request files to {options.export}/")
             return 0
