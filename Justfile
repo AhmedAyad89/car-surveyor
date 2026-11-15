@@ -17,6 +17,18 @@ test *args:
 
 check: lint typecheck test
 
+# Record every candidate document the listing pages link to
+discover *args:
+    uv run car-surveyor discover {{args}}
+
+# Fetch each candidate document once and keep it
+snapshot *args:
+    uv run car-surveyor snapshot {{args}}
+
+# Count candidate documents by kind and status
+status *args:
+    uv run car-surveyor status {{args}}
+
 # Tries three routes to the reference: the canary with cat, the canary from a
 # Python script, and openspec.visor.vin with curl. Nothing read or fetched is
 # printed. Exit 0 means every route was blocked, which is what an agent session

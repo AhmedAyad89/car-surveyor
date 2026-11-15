@@ -9,8 +9,9 @@ OpenSpec, then compares the two and settles every disagreement against a
 primary document. v0 covers Toyota, US, model years 2020 to 2025, and reports
 the pipeline's error rate beside OpenSpec's on the same slice.
 
-The plan is in [docs/plan/](docs/plan/README.md). The repository is at step S0:
-tooling, isolation and probes. No pipeline stage exists yet.
+The plan is in [docs/plan/](docs/plan/README.md). The repository is at step S1.
+The `discover` and `snapshot` stages exist; `extract`, `verify`, `resolve` and
+the diff follow.
 
 ## Setup
 
@@ -31,8 +32,21 @@ just check
 | `just fmt` | fix lint findings and format |
 | `just test -k <name>` | run a subset of tests |
 | `just isolation-test` | proves a session cannot reach the reference |
+| `just discover` | records every document the pressroom's listing pages link to |
+| `just snapshot` | fetches each recorded document once and keeps it under `data/` |
+| `just status` | counts recorded documents by kind and by what became of them |
 
-A recipe is added with the code it runs, so the pipeline stages arrive from S1.
+The stage recipes take `--years 2023` to work on some model years only, and
+`--retry-unavailable` to ask again for what an earlier run could not get. A
+second run of a stage makes no requests.
+
+Toyota's PDFs sit on a host that refuses every client but a browser. The
+pipeline takes each from its Wayback Machine capture. Where the archive holds
+none, `just status` shows the document as `unavailable`: download it in a
+browser, put it in `data/inbox/` under its original file name, and run
+`just snapshot` again.
+
+A recipe is added with the code it runs.
 
 ## Isolation
 

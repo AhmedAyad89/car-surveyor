@@ -54,13 +54,16 @@ user runs `just reference-coverage`, which prints counts only.
 - A model year is assembled from several documents. Some releases price
   only a new grade, a grade can be priced later than the rest of its
   model, and prices change mid-year.
-- Python HTTP libraries (urllib, requests, httpx) received HTTP 403.
-  curl with its default user agent received 200. Use a client the site
-  accepts and `robots.txt` permits, identify it honestly, and never
-  impersonate a browser. If the site refuses, use the Wayback copy.
+- The pressroom's pages are fetched with a Python client that names the
+  project in its user agent, 10 seconds apart as `robots.txt` asks. Never
+  impersonate a browser.
+- The PDFs are not on the pressroom. They are on a storage host that
+  answers 403 to every client that is not a browser, so each one comes
+  from its Wayback capture, or from a file downloaded by hand into
+  `data/inbox/` when the archive holds none.
 
-**Probe:** documents per model year for 2020 to 2025, the fetch method
-that works, and what `robots.txt` allows.
+Probed on 2026-11-15: [the pressroom](../findings/2026-11-15-pressroom.md)
+and [the documents](../findings/2026-11-15-documents.md).
 
 ### Others
 
