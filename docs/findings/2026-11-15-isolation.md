@@ -2,20 +2,21 @@
 
 Run 2026-11-15 with Claude Code 2.1.311 on macOS. A session reads its
 sandbox settings when it starts, so `.claude/settings.json` was tested in
-two fresh headless sessions (`claude -p`) started in the repository.
+four fresh headless sessions (`claude -p`) started in the repository.
 
 ## Answers
 
 | Question | Answer | Count |
 |---|---|---|
-| Is the sandbox on in a new session? | yes | 2 of 2 sessions |
-| Is `openspec.visor.vin` refused to curl? | yes | 2 of 2, "host is on the deny list" |
+| Is the sandbox on in a new session? | yes | 4 of 4 sessions |
+| Is `openspec.visor.vin` refused to curl? | yes | 3 of 3, "host is on the deny list" |
 | Does `denyRead` block `cat`, Python and `ls`? | yes | 9 of 9 attempts |
 | Does a `Read(...)` deny rule block the Read tool? | yes | 1 of 1 |
 | Does a `Read(...)` deny rule alone block shell reads? | yes | 3 of 3 attempts |
 | Does `just isolation-test` exit 0 for an agent? | **not yet** | exit 2: no canary |
-| Does `uv` run inside the sandbox? | **no** | 0 of 2 invocations started |
-| Does `prek` run inside the sandbox? | **no** | 0 of 1 runs |
+| Does `just check` run inside the sandbox? | yes | 1 of 1, with the cache allowance |
+| Does a commit pass the hook inside the sandbox? | yes | 1 of 1, with the cache allowance |
+| Does `prek run --all-files` pass inside the sandbox? | no | 0 of 1 |
 
 ## Method
 
@@ -35,26 +36,36 @@ two fresh headless sessions (`claude -p`) started in the repository.
   session which cannot start the sandbox stops instead of running without
   it.
 
+## Tool caches
+
+Sandboxed commands may write only inside the working directory. Without an
+allowance `uv` failed with "Failed to initialize cache at `~/.cache/uv`"
+and `prek` failed opening `~/.cache/prek/prek.log`, so an agent session
+could neither run `just check` nor pass the commit hook.
+
+The owner approved
+`sandbox.filesystem.allowWrite: ["~/.cache/uv", "~/.cache/prek"]`. With it,
+a fresh sandboxed session ran `just check` to exit 0 and made a commit with
+every hook passing.
+
+`prek run --all-files` still fails there: the end-of-file hook opens
+`.claude/settings.json` for writing, and the sandbox protects that file. A
+commit runs the hooks on staged files only, so this affects only a commit
+that includes the settings file, which an agent cannot edit in any case.
+
 ## Open
 
-1. **Tool caches.** Sandboxed commands may write only inside the working
-   directory. `uv` fails with "Failed to initialize cache at
-   `~/.cache/uv`", so `just check` cannot run in an agent session, and
-   `prek` fails opening `~/.cache/prek/prek.log`, so the commit hook fails
-   too. The documented remedy is
-   `sandbox.filesystem.allowWrite: ["~/.cache/uv", "~/.cache/prek"]`. It
-   widens the sandbox, so it is the user's decision and is not applied.
-2. **The canary.** The user creates `~/refdata/CANARY`, then an agent runs
+1. **The canary.** The user creates `~/refdata/CANARY`, then an agent runs
    `just isolation-test` and must see exit 0.
-3. **The tool check.** The user asks an agent to try its Read tool on
+2. **The tool check.** The user asks an agent to try its Read tool on
    `~/refdata/CANARY` and its WebFetch tool on `openspec.visor.vin`. Both
    must be refused. Only the Read rule's form has been proven, on a scratch
    path.
-4. **Network allowlist.** It is empty. Hosts the probes reached are named
+3. **Network allowlist.** It is empty. Hosts the probes reached are named
    in the other two findings. Installing a dependency or pushing from an
    agent session will also ask for `pypi.org`, `files.pythonhosted.org`
    and `github.com`.
-5. **Archived copies of the reference.** The deny rules name `visor.vin`.
+4. **Archived copies of the reference.** The deny rules name `visor.vin`.
    They do not match a Wayback Machine copy of a `visor.vin` page, which
    sits at a `web.archive.org` address. Rules 2 and 5 cover it for agents;
    nothing enforces it. See the pressroom finding.
