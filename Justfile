@@ -29,6 +29,18 @@ snapshot *args:
 extract *args:
     uv run car-surveyor extract {{args}}
 
+# Admit or reject each extracted claim against its document
+verify *args:
+    uv run car-surveyor verify {{args}}
+
+# Build one row per style from the admitted claims, then run the consistency checks
+resolve *args:
+    uv run car-surveyor resolve {{args}}
+
+# Run every stage in order for a split: dev, heldout or all
+run split:
+    uv run car-surveyor run {{split}}
+
 # Count candidate documents by kind and status
 status *args:
     uv run car-surveyor status {{args}}

@@ -9,7 +9,16 @@ from pathlib import Path
 
 import duckdb
 
-from car_surveyor import discovery, extraction, snapshot, source, storage
+from car_surveyor import (
+    consistency,
+    discovery,
+    extraction,
+    resolution,
+    snapshot,
+    source,
+    storage,
+    verification,
+)
 from car_surveyor.config import Settings
 from car_surveyor.fetcher import Fetcher
 from car_surveyor.source import Registry
@@ -31,7 +40,8 @@ def main(arguments: Sequence[str] | None = None) -> int:
         return 0 if is_usable else 1
     settings = Settings() if options.data_dir is None else Settings(data_dir=options.data_dir)
     registry = source.load_registry(settings.registry_path)
-    years = tuple(options.years) if options.years else registry.model_years
+    chosen_years = getattr(options, "years", None)
+    years = tuple(chosen_years) if chosen_years else registry.model_years
     connection = storage.connect(settings.database_path)
     try:
         if options.stage == "discover":
@@ -40,6 +50,12 @@ def main(arguments: Sequence[str] | None = None) -> int:
             run_snapshot(connection, registry, settings, years, options.retry_unavailable)
         elif options.stage == "extract":
             return run_extract(connection, registry, settings, options)
+        elif options.stage == "verify":
+            run_verify(connection, registry, settings, is_rechecking=options.recheck)
+        elif options.stage == "resolve":
+            run_resolve(connection)
+        elif options.stage == "run":
+            return run_all(connection, registry, settings, options.split)
         else:
             print_status(source.list_candidates(connection, model_years=years))
     finally:
@@ -79,6 +95,17 @@ def build_parser() -> argparse.ArgumentParser:
         "--import", type=Path, metavar="DIR", dest="import_dir", help="read answer files from DIR"
     )
     extract.add_argument("--label", help="the name of the runner that answers exported requests")
+    verify = stages.add_parser("verify", help="admit or reject each extracted claim")
+    verify.add_argument(
+        "--recheck", action="store_true", help="settle every claim again, under the current rules"
+    )
+    stages.add_parser("resolve", help="build one row per style from the admitted claims")
+    run = stages.add_parser("run", help="run every stage in order for a split")
+    run.add_argument(
+        "split",
+        choices=("dev", "heldout", "all"),
+        help="dev: the development year; heldout: the other model years; all: both",
+    )
     check_answer = stages.add_parser(
         "check-answer", help="check an answer file against the schema of its request file"
     )
@@ -151,7 +178,12 @@ def run_extract(
         report = extraction.import_answers(connection, settings, options.label, options.import_dir)
         print(f"extract (answers from {options.label}): {report.describe()}")
         return 0
+    return run_api_extract(connection, settings, is_retrying_failed=options.retry_failed)
 
+
+def run_api_extract(
+    connection: duckdb.DuckDBPyConnection, settings: Settings, *, is_retrying_failed: bool
+) -> int:
     key = settings.anthropic_api_key
     extractor = extraction.AnthropicExtractor(
         settings.extraction_model,
@@ -160,7 +192,7 @@ def run_extract(
     )
     try:
         report = extraction.extract_documents(
-            connection, settings, extractor, is_retrying_failed=options.retry_failed
+            connection, settings, extractor, is_retrying_failed=is_retrying_failed
         )
     except TypeError as error:
         # The SDK raises this, not an API error, when it finds no credentials.
@@ -169,6 +201,46 @@ def run_extract(
         print(NO_CREDENTIALS)
         return 1
     print(f"extract ({extractor.label}): {report.describe()}")
+    return 0
+
+
+def run_verify(
+    connection: duckdb.DuckDBPyConnection,
+    registry: Registry,
+    settings: Settings,
+    *,
+    is_rechecking: bool = False,
+) -> None:
+    if is_rechecking:
+        verification.reset_claims(connection)
+    print(f"verify: {verification.verify_claims(connection, settings, registry).describe()}")
+
+
+def run_resolve(connection: duckdb.DuckDBPyConnection) -> None:
+    print(f"resolve: {resolution.resolve(connection).describe()}")
+    findings = consistency.run_checks(connection)
+    print(f"consistency checks: {consistency.describe_findings(findings)}")
+
+
+def run_all(
+    connection: duckdb.DuckDBPyConnection, registry: Registry, settings: Settings, split: str
+) -> int:
+    """Run every stage in order for the development year, the held-out years, or both."""
+    held_out = tuple(year for year in registry.model_years if year != registry.development_year)
+    years = {
+        "dev": (registry.development_year,),
+        "heldout": held_out,
+        "all": registry.model_years,
+    }[split]
+    run_discover(connection, registry, settings, years, is_retrying_unavailable=False)
+    run_snapshot(connection, registry, settings, years, is_retrying_unavailable=False)
+    parsed = extraction.extract_fuel_economy(connection, settings, registry)
+    print(f"extract (fuel economy file): {parsed.describe()}")
+    status = run_api_extract(connection, settings, is_retrying_failed=False)
+    if status != 0:
+        return status
+    run_verify(connection, registry, settings)
+    run_resolve(connection)
     return 0
 
 
