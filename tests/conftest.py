@@ -106,7 +106,9 @@ def _text_stream(lines: list[str]) -> str:
 
 
 def _table_stream(rows: list[list[str]]) -> str:
-    column_width, row_height, left, top = 150, 20, 60, 720
+    row_height, left, top = 20, 60, 720
+    # As wide as fits the page, so a four-column table stays on it.
+    column_width = min(150, (612 - 2 * left) // max(len(row) for row in rows))
     parts: list[str] = []
     for row_index, row in enumerate(rows):
         for column_index, cell in enumerate(row):
@@ -114,5 +116,5 @@ def _table_stream(rows: list[list[str]]) -> str:
             y = top - (row_index + 1) * row_height
             parts.append(f"{x} {y} {column_width} {row_height} re S")
             if cell:
-                parts.append(f"BT /F1 10 Tf 1 0 0 1 {x + 4} {y + 6} Tm ({_escape(cell)}) Tj ET")
+                parts.append(f"BT /F1 8 Tf 1 0 0 1 {x + 4} {y + 6} Tm ({_escape(cell)}) Tj ET")
     return "\n".join(parts)
