@@ -41,6 +41,18 @@ resolve *args:
 run split:
     uv run car-surveyor run {{split}}
 
+# The two recipes below read the reference under ~/refdata. They are run by the
+# user, from their own terminal, and never by an agent: an agent session is
+# sandboxed out of ~/refdata, and the command refuses to start in one.
+#
+# Compare the pipeline's styles with the reference for a split: dev or heldout (USER ONLY)
+diff split:
+    uv run car-surveyor diff {{split}} --reference ~/refdata/openspec --detail-dir ~/refdata/out
+
+# Count what the reference holds per model year; prints counts only (USER ONLY)
+reference-coverage:
+    uv run car-surveyor reference-coverage --reference ~/refdata/openspec
+
 # Count candidate documents by kind and status
 status *args:
     uv run car-surveyor status {{args}}

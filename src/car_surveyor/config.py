@@ -36,6 +36,11 @@ class Settings(BaseSettings):
         return self.data_dir / "snapshots"
 
     @property
+    def feedback_dir(self) -> Path:
+        """What the diff may tell an agent: statuses and counts, never a reference value."""
+        return self.data_dir / "feedback"
+
+    @property
     def inbox_dir(self) -> Path:
         """Files downloaded by hand, for documents no permitted client can fetch."""
         return self.data_dir / "inbox"

@@ -39,6 +39,10 @@ target-version = "py314"
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]   # I = isort, so no separate isort
 
+[tool.ruff.lint.per-file-ignores]
+# Its parametrized cases are tables, one case to a line.
+"tests/test_diff.py" = ["E501"]
+
 [tool.ty.rules]
 
 [tool.pytest.ini_options]

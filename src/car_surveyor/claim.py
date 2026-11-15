@@ -38,6 +38,10 @@ ATTRIBUTES = (MSRP, DELIVERY_FEE, HORSEPOWER, TORQUE, MPG_CITY, MPG_HIGHWAY, MPG
 OEM_PRICING = "oem_pricing"
 OEM_SPECIFICATION = "oem_specification"
 EPA = "epa"
+# A claim an adjudicator recorded for one cell after re-reading a primary
+# document. It is verified like any claim, is never attached to a style by
+# the resolve stage, and is what the diff sets both sides against.
+ADJUDICATION = "adjudication"
 
 ClaimStatus = Literal["extracted", "admitted", "rejected"]
 
