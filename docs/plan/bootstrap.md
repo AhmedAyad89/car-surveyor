@@ -43,8 +43,7 @@ Add a dependency in the step that first imports it, not before.
   tool, a Node package, in S1; the Claude Agent SDK in S3.
 - **Not carried:** feedparser, pandas, jupytext, ipykernel, pytest-cov.
 
-Toyota's pressroom refuses Python HTTP clients, so it is fetched with
-curl; see [sources.md](sources.md#toyota-pressroom).
+How each source is fetched is in [sources.md](sources.md#toyota-pressroom).
 
 ## 4. Layout
 

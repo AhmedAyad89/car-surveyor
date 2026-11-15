@@ -1,0 +1,49 @@
+# The source registry. The fetcher refuses any address whose host is not
+# listed here, so adding a source is a reviewed change to this file.
+# What each source gives is in docs/plan/sources.md.
+
+make: Toyota
+market: US
+model_years: [2020, 2021, 2022, 2023, 2024, 2025]
+development_year: 2023
+
+sources:
+  - id: toyota_pressroom
+    hosts: [pressroom.toyota.com]
+    route: direct
+    crawl_delay_seconds: 10 # robots.txt, read 2026-11-15
+
+  # Every pressroom PDF is stored here. The host answers 403 to any client
+  # that is not a browser, so these documents come from a Wayback capture or
+  # from a file downloaded by hand into data/inbox/.
+  - id: toyota_media
+    hosts: [toyota-cms-media.s3.amazonaws.com, s3.amazonaws.com]
+    path_prefixes:
+      s3.amazonaws.com: /toyota-cms-media/
+    route: archive
+
+  # The Wayback Machine also archives the reference. The fetcher accepts a
+  # Wayback address only when the archived address belongs to a source named
+  # under `archives`.
+  - id: wayback
+    hosts: [web.archive.org, archive.org]
+    route: direct
+    crawl_delay_seconds: 3
+    archives: [toyota_media, toyota_pressroom]
+
+  - id: fueleconomy
+    hosts: [www.fueleconomy.gov]
+    route: direct
+    crawl_delay_seconds: 2
+
+# Pages that list documents. `discover` fetches them and records every link.
+listings:
+  - url: https://pressroom.toyota.com/vehicle-sitemap.xml
+    kind: vehicle_sitemap
+  - url: https://pressroom.toyota.com/toyota-full-line-pricing/
+    kind: pricing_listing
+
+# Documents at a fixed address.
+documents:
+  - url: https://www.fueleconomy.gov/feg/epadata/vehicles.csv.zip
+    kind: fuel_economy_file
