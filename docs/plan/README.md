@@ -54,7 +54,7 @@ slice, the gaps the pipeline fills, and the styles each side lacks.
 | `verify` | code confirms each value at that place, then runs consistency checks |
 | `resolve` | builds the query views |
 | `diff` | a plain script, run by the user, compares the views with OpenSpec and writes a coarse feedback file |
-| `report` | metrics and a three-page dashboard |
+| `view` | a local page for inspecting the data and the diff |
 
 ## Rules
 
@@ -89,20 +89,25 @@ v0 is done when S4's gate passes.
 - The repository is `car-surveyor` and the Python package is
   `car_surveyor`.
 
+**Made while building S1, 2026-11-16, for the user to overrule**
+
+- The development year is 2023, the plan's default.
+- Reference rows are matched to pipeline styles by Toyota's model code,
+  which the reference carries, and then by description. See
+  [evaluation.md](evaluation.md#row-matching).
+- The dashboard is a local viewer over the database, not an Evidence
+  site. See [design.md](design.md#viewer).
+
 **Proposed in review, to confirm**
 
 - OpenSpec's published schema file may sit in the repository. Its data
   may not.
-- The development year is 2023 unless the S0 probes point elsewhere.
 - One agent in v0, the adjudicator in S3.
 
 **Open**
 
-1. How pipeline styles are matched to reference styles. Names are not
-   standardised, so some fuzzy matching is likely. Decide in S1; see
-   [evaluation.md](evaluation.md#row-matching-open).
-2. A time box and a spend cap per step.
-3. Whether confirmed OpenSpec errors are sent to Visor.
+1. A time box and a spend cap per step.
+2. Whether confirmed OpenSpec errors are sent to Visor.
 
 **Not in v0:** other makes, options and features, automatic repair of
 detected problems, an MCP server, sales data, other markets.

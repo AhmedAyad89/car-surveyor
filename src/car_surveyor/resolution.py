@@ -327,7 +327,7 @@ def attach_claims(styles: list[Style], values: list[ValueClaim]) -> list[Attachm
     specification: dict[str, list[ValueClaim]] = defaultdict(list)
     file_rows: dict[tuple[str, str], list[ValueClaim]] = defaultdict(list)
     for value in values:
-        if value.value_num is None:
+        if value.value_num is None or value.source_class == claim.ADJUDICATION:
             continue
         if value.attribute == claim.MSRP:
             if value.style_key in by_key:

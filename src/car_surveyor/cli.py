@@ -3,16 +3,21 @@
 from __future__ import annotations
 
 import argparse
+import os
+import subprocess
 from collections import Counter
 from collections.abc import Sequence
+from datetime import UTC, datetime
 from pathlib import Path
 
 import duckdb
 
 from car_surveyor import (
     consistency,
+    diff,
     discovery,
     extraction,
+    reference,
     resolution,
     snapshot,
     source,
@@ -22,6 +27,12 @@ from car_surveyor import (
 from car_surveyor.config import Settings
 from car_surveyor.fetcher import Fetcher
 from car_surveyor.source import Registry
+
+# Claude Code sets this in every shell an agent runs.
+AGENT_SESSION_VARIABLE = "CLAUDECODE"
+AGENT_REFUSAL = """\
+{command}: refused. This command reads the reference, so only the user runs it,
+  from their own terminal and never from an agent session."""
 
 NO_CREDENTIALS = """\
 extract: no Claude API credentials were found, so no document was read.
@@ -40,6 +51,8 @@ def main(arguments: Sequence[str] | None = None) -> int:
         return 0 if is_usable else 1
     settings = Settings() if options.data_dir is None else Settings(data_dir=options.data_dir)
     registry = source.load_registry(settings.registry_path)
+    if options.stage in ("diff", "reference-coverage"):
+        return run_reference_command(registry, settings, options)
     chosen_years = getattr(options, "years", None)
     years = tuple(chosen_years) if chosen_years else registry.model_years
     connection = storage.connect(settings.database_path)
@@ -106,6 +119,18 @@ def build_parser() -> argparse.ArgumentParser:
         choices=("dev", "heldout", "all"),
         help="dev: the development year; heldout: the other model years; all: both",
     )
+    compare = stages.add_parser(
+        "diff", help="compare the styles with the reference (run by the user only)"
+    )
+    compare.add_argument("split", choices=("dev", "heldout"))
+    compare.add_argument("--reference", type=Path, required=True, help="the OpenSpec bundle")
+    compare.add_argument(
+        "--detail-dir", type=Path, required=True, help="where the file with both sides goes"
+    )
+    coverage = stages.add_parser(
+        "reference-coverage", help="count what the reference holds (run by the user only)"
+    )
+    coverage.add_argument("--reference", type=Path, required=True, help="the OpenSpec bundle")
     check_answer = stages.add_parser(
         "check-answer", help="check an answer file against the schema of its request file"
     )
@@ -242,6 +267,66 @@ def run_all(
     run_verify(connection, registry, settings)
     run_resolve(connection)
     return 0
+
+
+def run_reference_command(
+    registry: Registry, settings: Settings, options: argparse.Namespace
+) -> int:
+    """Run the diff or the coverage count. Both read the reference, so only the user may.
+
+    The sandbox keeps an agent out of the reference. This refusal is a second
+    barrier for a session that started without the sandbox.
+    """
+    if os.environ.get(AGENT_SESSION_VARIABLE):
+        print(AGENT_REFUSAL.format(command=options.stage))
+        return 3
+    try:
+        rows = reference.load_reference(options.reference, registry.make)
+    except reference.ReferenceFormatError as error:
+        print(f"{options.stage}: {error}")
+        return 1
+    if options.stage == "reference-coverage":
+        print(reference.describe_coverage(rows))
+        return 0
+
+    is_development = options.split == "dev"
+    years = tuple(
+        year
+        for year in registry.model_years
+        if (year == registry.development_year) == is_development
+    )
+    if not settings.database_path.is_file():
+        print(f"diff: no database at {settings.database_path}; run the pipeline first")
+        return 1
+    connection = storage.connect(settings.database_path, is_read_only=True)
+    try:
+        result = diff.build_diff(
+            diff.load_pipeline_styles(connection, years),
+            [row for row in rows if row.model_year in years],
+            diff.load_adjudications(connection),
+            split=options.split,
+            model_years=years,
+            created_at=datetime.now(UTC),
+            git_sha=get_git_sha(),
+        )
+    finally:
+        connection.close()
+    # Feedback from the held-out years must not reach code before S4.
+    feedback_dir = settings.feedback_dir if is_development else None
+    print(result.describe())
+    for path in diff.write_diff(result, options.detail_dir, feedback_dir):
+        print(f"  wrote {path}")
+    return 0
+
+
+def get_git_sha() -> str:
+    try:
+        completed = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True, check=True
+        )
+    except OSError, subprocess.CalledProcessError:
+        return "unknown"
+    return completed.stdout.strip()
 
 
 def print_status(candidates: list[source.Candidate]) -> None:

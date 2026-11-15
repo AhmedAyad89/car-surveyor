@@ -9,9 +9,9 @@ OpenSpec, then compares the two and settles every disagreement against a
 primary document. v0 covers Toyota, US, model years 2020 to 2025, and reports
 the pipeline's error rate beside OpenSpec's on the same slice.
 
-The plan is in [docs/plan/](docs/plan/README.md), and how the pipeline works is
-in [docs/plan/design.md](docs/plan/design.md). Every pipeline stage exists; the
-diff against OpenSpec follows.
+The plan is in [docs/plan/](docs/plan/README.md), how the pipeline works is in
+[docs/plan/design.md](docs/plan/design.md), and how it is scored is in
+[docs/plan/evaluation.md](docs/plan/evaluation.md).
 
 ## Setup
 
@@ -39,6 +39,8 @@ just check
 | `just resolve` | builds one row per style from the admitted claims, then runs the consistency checks |
 | `just run dev` | runs every stage in order for the development year (`heldout` and `all` also work) |
 | `just status` | counts recorded documents by kind and by what became of them |
+| `just diff dev` | **you only, from your own terminal:** compares the styles with OpenSpec |
+| `just reference-coverage` | **you only:** counts what OpenSpec holds per model year |
 
 The stage recipes take `--years 2023` to work on some model years only, and
 `--retry-unavailable` to ask again for what an earlier run could not get. A
@@ -63,6 +65,17 @@ pipeline takes each from its Wayback Machine capture. Where the archive holds
 none, `just status` shows the document as `unavailable`: download it in a
 browser, put it in `data/inbox/` under its original file name, and run
 `just snapshot` again.
+
+## Scoring against OpenSpec
+
+`just diff dev` reads the OpenSpec bundle at `~/refdata/openspec/` and writes
+two files. `~/refdata/out/<run_id>.json` holds both sides' values and is for
+you. `data/feedback/<run_id>.json` holds a status per cell and counts, with no
+OpenSpec value in it, and is what an agent may read. `just diff heldout` writes
+only the first, so the held-out years stay unseen until the end.
+
+The command refuses to start inside a Claude Code session. Run it in a plain
+terminal.
 
 A recipe is added with the code it runs.
 
