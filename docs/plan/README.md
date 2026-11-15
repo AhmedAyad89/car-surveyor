@@ -86,6 +86,8 @@ v0 is done when S4's gate passes.
 - Toyota, US, model years 2020 to 2025.
 - OpenSpec is the only reference. CarAPI is dropped.
 - The diff is a plain script.
+- The repository is `car-surveyor` and the Python package is
+  `car_surveyor`.
 
 **Proposed in review, to confirm**
 
@@ -100,8 +102,7 @@ v0 is done when S4's gate passes.
    standardised, so some fuzzy matching is likely. Decide in S1; see
    [evaluation.md](evaluation.md#row-matching-open).
 2. A time box and a spend cap per step.
-3. The repository name.
-4. Whether confirmed OpenSpec errors are sent to Visor.
+3. Whether confirmed OpenSpec errors are sent to Visor.
 
 **Not in v0:** other makes, options and features, automatic repair of
 detected problems, an MCP server, sales data, other markets.

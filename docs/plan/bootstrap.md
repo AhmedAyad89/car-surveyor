@@ -60,7 +60,7 @@ sql/views.sql
 docs/plan/                   # this folder
 docs/findings/               # probe results and diff reports, dated
 docs/reference_schema/       # placed by the user
-src/automotive_surveyor/
+src/car_surveyor/
   source.py  snapshot.py  extraction.py  evidence.py
   verification.py  resolution.py  storage.py  cli.py
   reference.py               # loads ~/refdata; for diff.py and

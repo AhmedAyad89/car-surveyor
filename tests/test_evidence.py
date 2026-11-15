@@ -6,7 +6,7 @@ model name and the figures are made up; nothing here is a source for a value.
 
 from __future__ import annotations
 
-from automotive_surveyor import evidence
+from car_surveyor import evidence
 
 SOURCE = (
     "The 2023 Toyota Example LE has a Manufacturer’s Suggested Retail Price of $28,495. "

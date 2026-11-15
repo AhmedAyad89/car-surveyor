@@ -45,5 +45,3 @@ in `~/refdata/`, and `.claude/settings.json` keeps agents away from it and from
 `just isolation-test` tries three routes to the reference. Run by an agent it
 must report every route blocked and exit 0. Run from your own terminal it
 reports them open and exits 1, which proves the test is real.
-
-The Python package is `automotive_surveyor`, the name the plan gives it.

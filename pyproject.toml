@@ -1,5 +1,5 @@
 [project]
-name = "automotive-surveyor"
+name = "car-surveyor"
 version = "0.1.0"
 description = "Rebuilds a slice of the OpenSpec US vehicle catalogue from primary documents, then scores both against those documents."
 readme = "README.md"
