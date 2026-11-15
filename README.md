@@ -62,9 +62,9 @@ passes the same schema and the same verification.
 
 Toyota's PDFs sit on a host that refuses every client but a browser. The
 pipeline takes each from its Wayback Machine capture. Where the archive holds
-none, `just status` shows the document as `unavailable`: download it in a
-browser, put it in `data/inbox/` under its original file name, and run
-`just snapshot` again.
+none, the document is `unavailable`. `just status --missing` lists each one
+with its address: download it in a browser, put it in `data/inbox/` under its
+original file name, and run `just snapshot` again.
 
 ## Scoring against OpenSpec
 

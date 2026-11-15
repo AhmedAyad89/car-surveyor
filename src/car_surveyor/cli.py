@@ -70,7 +70,10 @@ def main(arguments: Sequence[str] | None = None) -> int:
         elif options.stage == "run":
             return run_all(connection, registry, settings, options.split)
         else:
-            print_status(source.list_candidates(connection, model_years=years))
+            candidates = source.list_candidates(connection, model_years=years)
+            print_status(candidates)
+            if options.missing:
+                print_missing(candidates, settings)
     finally:
         connection.close()
     return 0
@@ -136,7 +139,14 @@ def build_parser() -> argparse.ArgumentParser:
     )
     check_answer.add_argument("request", type=Path)
     check_answer.add_argument("answer", type=Path)
-    stages.add_parser("status", parents=[shared], help="count candidates by kind and status")
+    status = stages.add_parser(
+        "status", parents=[shared], help="count candidates by kind and status"
+    )
+    status.add_argument(
+        "--missing",
+        action="store_true",
+        help="also list each document that could not be fetched, for downloading by hand",
+    )
     return parser
 
 
@@ -333,6 +343,24 @@ def print_status(candidates: list[source.Candidate]) -> None:
     counts = Counter((candidate.kind, candidate.status) for candidate in candidates)
     for (kind, status), count in sorted(counts.items()):
         print(f"  {kind:<26} {status:<12} {count}")
+
+
+def print_missing(candidates: list[source.Candidate], settings: Settings) -> None:
+    """List the documents no permitted client could fetch, with where to put a copy.
+
+    A file saved from a browser into the inbox under its original name is
+    picked up by the next `snapshot` run.
+    """
+    missing = [
+        candidate
+        for candidate in candidates
+        if candidate.status == "unavailable" and candidate.kind != source.VEHICLE_PAGE
+    ]
+    print(f"\n{len(missing)} documents to download by hand into {settings.inbox_dir}/:")
+    for candidate in sorted(missing, key=lambda held: (held.model_years, held.kind, held.url)):
+        years = ", ".join(str(year) for year in candidate.model_years) or "any year"
+        print(f"  [{years}] {candidate.kind}: {candidate.url}")
+        print(f"      {candidate.detail}")
 
 
 if __name__ == "__main__":
