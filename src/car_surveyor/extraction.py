@@ -20,8 +20,10 @@ from __future__ import annotations
 import csv
 import io
 import json
+import re
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
+from decimal import Decimal
 from pathlib import Path
 from typing import Any, Literal, Protocol
 
@@ -53,6 +55,8 @@ PRICES_PER_MILLION_TOKENS = {
     "claude-haiku-5-5": (0.1, 0.5),
 }
 MAX_OUTPUT_TOKENS = 64000
+
+_DOLLAR_AMOUNT_PATTERN = re.compile(r"\$\s?\d")
 
 _FUEL_ECONOMY_COLUMNS = {
     claim.MPG_CITY: "city08",
@@ -365,7 +369,11 @@ def extract_documents(
 def export_requests(
     connection: duckdb.DuckDBPyConnection, settings: Settings, label: str, directory: Path
 ) -> list[Path]:
-    """Write a request file for every document the labelled extractor has not read."""
+    """Write a request file for every document the labelled extractor has not read.
+
+    The request file holds everything, for a program. Beside it go the
+    document as plain text and the answer's schema, for a reader.
+    """
     directory.mkdir(parents=True, exist_ok=True)
     written: list[Path] = []
     for snapshot in list_snapshots(connection, settings, kinds=tuple(PROMPTS_BY_KIND)):
@@ -373,7 +381,12 @@ def export_requests(
         if find_extraction_status(connection, snapshot.sha256, extractor_version) == "done":
             continue
         request = build_request(snapshot)
-        path = directory / f"{snapshot.sha256}.request.json"
+        stem = directory / snapshot.sha256
+        document_path = stem.with_suffix(".document.txt")
+        schema_path = stem.with_suffix(".schema.json")
+        document_path.write_text(request.document, encoding="utf-8")
+        schema_path.write_text(json.dumps(request.schema, indent=1), encoding="utf-8")
+        path = stem.with_suffix(".request.json")
         path.write_text(
             json.dumps(
                 {
@@ -381,7 +394,10 @@ def export_requests(
                     "url": request.url,
                     "kind": request.kind,
                     "extractor_version": extractor_version,
-                    "answer_file": f"{snapshot.sha256}.answer.json",
+                    "instructions_file": str(PROMPT_DIR / f"{request.prompt_name}.md"),
+                    "document_file": document_path.name,
+                    "schema_file": schema_path.name,
+                    "answer_file": stem.with_suffix(".answer.json").name,
                     "system": request.system,
                     "document": request.document,
                     "schema": request.schema,
@@ -416,6 +432,38 @@ def import_answers(
         problem = record_answer(connection, snapshot, extractor_version, response)
         (report.failed if problem else report.extracted).append(snapshot.url)
     return report
+
+
+def check_answer_file(request_path: Path, answer_path: Path) -> tuple[bool, str]:
+    """Check an answer file against its request's schema, without the database.
+
+    Returns whether the answer is usable, and a summary for whoever wrote it.
+    For a pricing document the summary also counts the table rows that print
+    a dollar amount, so a short answer shows before it costs a style.
+    """
+    request = json.loads(request_path.read_text(encoding="utf-8"))
+    try:
+        answer = ANSWERS_BY_KIND[request["kind"]].model_validate_json(
+            answer_path.read_text(encoding="utf-8")
+        )
+    except ValidationError as error:
+        lines = [f"{answer_path.name}: does not fit the schema, {error.error_count()} errors"]
+        for problem in error.errors()[:15]:
+            where = ".".join(str(part) for part in problem["loc"])
+            lines.append(f"  {where}: {problem['msg']}")
+        return False, "\n".join(lines)
+    if isinstance(answer, SpecificationAnswer):
+        return True, f"{answer_path.name}: fits the schema, {len(answer.values)} values"
+    priced_rows = sum(
+        1
+        for line in request["document"].splitlines()
+        if " | " in line and _DOLLAR_AMOUNT_PATTERN.search(line)
+    )
+    return True, (
+        f"{answer_path.name}: fits the schema, {len(answer.rows)} rows and "
+        f"{len(answer.delivery_fees)} delivery fees. The document's tables hold "
+        f"{priced_rows} rows that print a dollar amount."
+    )
 
 
 def record_answer(
@@ -471,7 +519,14 @@ def check_document_date(stated: DatedQuote | None, text: str) -> date | None:
     has_month = parsed.month in numbers or any(
         name in evidence.normalize_for_matching(stated.quote) for name in month_names
     )
-    has_year = parsed.year in numbers or parsed.year % 100 in numbers
+    # A two-digit year counts only where the quote prints no four-digit one,
+    # and only if it is not just the day or the month seen again.
+    short_year = Decimal(parsed.year % 100)
+    needed = 1 + (parsed.day == short_year) + (parsed.month == short_year)
+    has_short_year = not any(number >= 1000 for number in numbers) and (
+        numbers.count(short_year) >= needed
+    )
+    has_year = parsed.year in numbers or has_short_year
     return parsed if has_year and has_month and parsed.day in numbers else None
 
 

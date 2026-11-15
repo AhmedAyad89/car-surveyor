@@ -25,7 +25,11 @@ extract: no Claude API credentials were found, so no document was read.
 
 def main(arguments: Sequence[str] | None = None) -> int:
     options = build_parser().parse_args(arguments)
-    settings = Settings()
+    if options.stage == "check-answer":
+        is_usable, summary = extraction.check_answer_file(options.request, options.answer)
+        print(summary)
+        return 0 if is_usable else 1
+    settings = Settings() if options.data_dir is None else Settings(data_dir=options.data_dir)
     registry = source.load_registry(settings.registry_path)
     years = tuple(options.years) if options.years else registry.model_years
     connection = storage.connect(settings.database_path)
@@ -45,6 +49,9 @@ def main(arguments: Sequence[str] | None = None) -> int:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="car-surveyor", description=__doc__)
+    parser.add_argument(
+        "--data-dir", type=Path, help="where the database and snapshots are; default: data/"
+    )
     stages = parser.add_subparsers(dest="stage", required=True)
     shared = argparse.ArgumentParser(add_help=False)
     shared.add_argument(
@@ -72,6 +79,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--import", type=Path, metavar="DIR", dest="import_dir", help="read answer files from DIR"
     )
     extract.add_argument("--label", help="the name of the runner that answers exported requests")
+    check_answer = stages.add_parser(
+        "check-answer", help="check an answer file against the schema of its request file"
+    )
+    check_answer.add_argument("request", type=Path)
+    check_answer.add_argument("answer", type=Path)
     stages.add_parser("status", parents=[shared], help="count candidates by kind and status")
     return parser
 
