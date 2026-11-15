@@ -9,9 +9,9 @@ OpenSpec, then compares the two and settles every disagreement against a
 primary document. v0 covers Toyota, US, model years 2020 to 2025, and reports
 the pipeline's error rate beside OpenSpec's on the same slice.
 
-The plan is in [docs/plan/](docs/plan/README.md). The repository is at step S1.
-The `discover`, `snapshot` and `extract` stages exist; `verify`, `resolve` and
-the diff follow.
+The plan is in [docs/plan/](docs/plan/README.md), and how the pipeline works is
+in [docs/plan/design.md](docs/plan/design.md). Every pipeline stage exists; the
+diff against OpenSpec follows.
 
 ## Setup
 
@@ -35,6 +35,9 @@ just check
 | `just discover` | records every document the pressroom's listing pages link to |
 | `just snapshot` | fetches each recorded document once and keeps it under `data/` |
 | `just extract` | reads each snapshot once: one model call per document, a parser for the fuel economy file |
+| `just verify` | admits or rejects each extracted claim against its document |
+| `just resolve` | builds one row per style from the admitted claims, then runs the consistency checks |
+| `just run dev` | runs every stage in order for the development year (`heldout` and `all` also work) |
 | `just status` | counts recorded documents by kind and by what became of them |
 
 The stage recipes take `--years 2023` to work on some model years only, and

@@ -103,6 +103,54 @@ SCHEMA_STATEMENTS: tuple[str, ...] = (
         reject_reason TEXT NOT NULL
     )
     """,
+    # The resolve stage rebuilds the two tables below from the admitted
+    # claims on every run. The views over them are in sql/views.sql.
+    """
+    CREATE TABLE IF NOT EXISTS style_records (
+        style_key TEXT PRIMARY KEY,
+        model_year INTEGER NOT NULL,
+        model TEXT NOT NULL,
+        model_code TEXT,
+        grade TEXT,
+        powertrain TEXT,
+        body TEXT,
+        engine TEXT,
+        transmission TEXT,
+        drive TEXT,
+        description TEXT NOT NULL,
+        drive_class TEXT,
+        is_drive_inferred BOOLEAN NOT NULL,
+        transmission_class TEXT,
+        is_transmission_inferred BOOLEAN NOT NULL,
+        document_count INTEGER NOT NULL
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS style_values (
+        style_key TEXT NOT NULL,
+        attribute TEXT NOT NULL,
+        claim_id TEXT NOT NULL,
+        value_num DOUBLE NOT NULL,
+        value_text TEXT NOT NULL,
+        unit TEXT NOT NULL,
+        effective_date DATE,
+        source_class TEXT NOT NULL,
+        snapshot_sha256 TEXT NOT NULL,
+        specificity INTEGER NOT NULL,
+        note TEXT NOT NULL,
+        is_chosen BOOLEAN NOT NULL,
+        is_conflicting BOOLEAN NOT NULL
+    )
+    """,
+    # What the consistency checks found, rebuilt with the two tables above.
+    """
+    CREATE TABLE IF NOT EXISTS check_results (
+        check_name TEXT NOT NULL,
+        style_key TEXT NOT NULL,
+        attribute TEXT,
+        detail TEXT NOT NULL
+    )
+    """,
 )
 
 
