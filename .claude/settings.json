@@ -11,7 +11,8 @@
     "failIfUnavailable": true,
     "allowUnsandboxedCommands": false,
     "filesystem": {
-      "denyRead": ["~/refdata", "~/refdata/**"]
+      "denyRead": ["~/refdata", "~/refdata/**"],
+      "allowWrite": ["~/.cache/uv", "~/.cache/prek"]
     },
     "network": {
       "deniedDomains": ["visor.vin", "*.visor.vin"]
