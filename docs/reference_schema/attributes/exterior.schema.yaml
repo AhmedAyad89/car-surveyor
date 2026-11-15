@@ -1,0 +1,697 @@
+# OpenSpec Exterior Attributes
+# Lighting, mirrors, glass, wheels, and exterior equipment.
+# Omit any attribute that is not equipped on this trim/config.
+
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://openspec.visor.vin/schema/attributes/exterior.json
+title: Exterior Attributes
+type: object
+additionalProperties: false
+
+properties:
+
+  # ── Lighting ─────────────────────────────────
+  lighting:
+    type: object
+    additionalProperties: false
+    properties:
+      headlamps:
+        type: object
+        additionalProperties: false
+        description: Primary headlamp technology and any documented upgrade capabilities.
+        properties:
+          type:
+            description: Primary headlamp technology
+            oneOf:
+              - const: halogen
+                title: Halogen
+                description: Traditional halogen bulbs
+              - const: hid_projector
+                title: HID Projector
+                description: High-intensity discharge (Xenon) projector headlamp
+              - const: bi_xenon_projector
+                title: Bi-Xenon Projector
+                description: Single HID projector unit for both low and high beam
+              - const: led_reflector
+                title: LED Reflector
+                description: LED light source with reflector housing
+              - const: bi_led_projector
+                title: Bi-LED Projector
+                description: Single LED projector unit for both low and high beam
+              - const: led_matrix
+                title: LED Matrix
+                description: Individually addressable LED segments for selective illumination
+              - const: hd_matrix
+                title: HD Matrix
+                description: >
+                  High-resolution matrix LED system with dense, selectively
+                  controllable light segments.
+              - const: laser
+                title: Laser
+                description: Laser-assisted high beams
+          features:
+            type: array
+            uniqueItems: true
+            description: >
+              Additional headlamp capabilities beyond the base technology.
+              Omit if no upgraded capabilities are documented.
+            items:
+              type: string
+              oneOf:
+                - const: adaptive_beam
+                  title: Adaptive Beam
+                  description: >
+                    Beam pattern or distribution adapts based on steering,
+                    speed, traffic, or road conditions
+                - const: cornering
+                  title: Cornering Lights
+                  description: Additional illumination while turning at low speed
+                - const: auto_leveling
+                  title: Auto-Leveling
+                  description: Beam aim adjusts automatically for vehicle load
+
+      high_beam:
+        description: High beam control mode
+        oneOf:
+          - const: manual
+            title: Manual
+          - const: automatic
+            title: Automatic High Beams
+            description: Auto-switching based on oncoming traffic detection
+
+      front_turn_signals:
+        description: Front turn signal light type
+        oneOf:
+          - const: bulb
+            title: Bulb
+          - const: led
+            title: LED
+
+      daytime_running_lights:
+        description: DRL type. Omit if not equipped.
+        oneOf:
+          - const: led
+            title: LED
+          - const: halogen
+            title: Halogen
+
+      taillights:
+        description: Rear taillight type
+        oneOf:
+          - const: bulb
+            title: Bulb
+          - const: led_combination
+            title: LED Combination
+            description: LED taillights with bulb turn/stop
+          - const: premium_led
+            title: Premium LED
+            description: Full LED taillights including turn/stop
+          - const: led_sequential
+            title: Sequential LED
+            description: LED with sequential turn signal animation
+          - const: oled
+            title: OLED
+            description: Organic LED taillights with continuous light surface
+
+      fog_lights:
+        description: Fog light type. Omit if not equipped.
+        oneOf:
+          - const: halogen
+            title: Halogen
+          - const: led
+            title: LED
+
+      approach:
+        since: "1.15"
+        type: array
+        uniqueItems: true
+        description: >
+          Buyer-visible exterior lighting effects activated while approaching
+          or unlocking the vehicle. Omit conventional courtesy lighting that
+          is not marketed as a distinct capability.
+        items:
+          type: string
+          oneOf:
+            - const: ground_illumination
+              title: Ground Illumination
+              description: Illuminates the ground or approach path beside the vehicle
+            - const: logo_projection
+              title: Logo Projection
+              description: Projects an OEM emblem or graphic onto the ground
+            - const: animated_welcome_sequence
+              title: Animated Welcome Sequence
+              description: Performs a coordinated exterior-light animation
+
+  # ── Mirrors ──────────────────────────────────
+  mirrors:
+    type: object
+    additionalProperties: false
+    properties:
+      adjustment:
+        description: >
+          Mirror glass adjustment and powered housing-folding capability.
+          Select the most specific mechanism documented by the source.
+        oneOf:
+          - const: manual
+            title: Manual
+            description: Mirror glass angle is adjusted manually rather than electrically.
+          - const: power
+            title: Power
+            description: >
+              Mirror glass angle is adjusted electrically. This does not
+              establish whether or how the mirror housing folds.
+          - const: power_folding
+            title: Power Folding
+            description: >
+              Mirror housing folds electrically, distinct from electrical
+              adjustment of the glass. Requires an explicit statement that
+              the folding mechanism is powered.
+
+      finish:
+        description: Mirror housing finish
+        oneOf:
+          - const: black
+            title: Black
+          - const: matte_black
+            title: Matte Black
+          - const: gloss_black
+            title: Gloss Black
+          - const: body_color
+            title: Body Color
+          - const: chrome
+            title: Chrome
+
+      features:
+        type: array
+        description: Mirror features equipped. Omit if none beyond base adjustment.
+        items:
+          type: string
+          enum: [heated, auto_dimming, turn_signals,
+                 blind_spot_indicators, memory, reverse_tilt]
+
+  # ── Glass ────────────────────────────────────
+  windshield:
+    type: array
+    uniqueItems: true
+    description: >
+      Enhanced windshield glass or wiper-area de-icing properties
+      equipped. Omit if the windshield is a conventional laminated pane
+      only and no wiper de-icer is published. Multiple properties may
+      coexist on the same vehicle. Generic "solar glass," "solar control
+      glass," or heat-reduction wording does not by itself establish the
+      infrared-reflective coating represented by ir_reflective.
+    items:
+      type: string
+      oneOf:
+        - const: acoustic_laminated
+          title: Acoustic Laminated
+          description: Sound-dampening laminated glass
+        - const: heated
+          title: Heated Windshield
+          description: Windshield with embedded heating elements for de-icing
+        - const: ir_reflective
+          title: IR-Reflective
+          description: Infrared-reflective coating to reduce solar heat gain
+        - const: wiper_deicer
+          title: Wiper De-Icer
+          since: "1.6"
+          description: >
+            Heated windshield lower area or heating element positioned to
+            de-ice the parked windshield wipers.
+
+  privacy_glass:
+    type: array
+    description: Window positions with factory tinting
+    items:
+      type: string
+      enum: [rear, side_rear, quarter, liftgate]
+
+  side_glass:
+    since: "1.6"
+    type: array
+    uniqueItems: true
+    description: >
+      Enhanced side-window glass properties equipped. Omit if the side
+      windows are conventional tempered or laminated glass with no
+      published acoustic or infrared-reflective upgrade. Generic "solar
+      glass," "solar control glass," or heat-reduction wording does not by
+      itself establish either infrared-reflective enum value.
+    items:
+      type: string
+      oneOf:
+        - const: front_acoustic_laminated
+          title: Front Acoustic Laminated
+          description: Sound-dampening laminated front side-window glass
+        - const: rear_acoustic_laminated
+          title: Rear Acoustic Laminated
+          description: Sound-dampening laminated rear side-window glass
+        - const: front_ir_reflective
+          title: Front IR-Reflective
+          description: >
+            Infrared-reflective coating or laminated glass on the front
+            side windows to reduce solar heat gain.
+        - const: rear_ir_reflective
+          title: Rear IR-Reflective
+          description: >
+            Infrared-reflective coating or laminated glass on the rear
+            side windows to reduce solar heat gain.
+
+  # ── Wipers ───────────────────────────────────
+  wipers_front:
+    description: Front wiper type
+    oneOf:
+      - const: intermittent
+        title: Intermittent
+      - const: variable_speed
+        title: Variable Speed
+      - const: rain_sensing
+        title: Rain Sensing
+
+  wipers_rear:
+    description: Rear wiper type. Omit if not equipped.
+    oneOf:
+      - const: intermittent
+        title: Intermittent
+      - const: variable_speed
+        title: Variable Speed
+
+  # ── Wheels ───────────────────────────────────
+  wheels:
+    type: object
+    additionalProperties: false
+    properties:
+      size_in:
+        type: number
+        minimum: 12
+        maximum: 26
+        description: Wheel diameter in inches
+
+      type:
+        description: Wheel construction/material
+        oneOf:
+          - const: steel
+            title: Steel
+          - const: alloy
+            title: Alloy
+          - const: dark_alloy
+            title: Dark-Finished Alloy
+            description: Alloy wheel with dark or gloss black painted finish
+          - const: machined_alloy
+            title: Machined Alloy
+            description: Alloy wheel with machined face and contrasting painted finish
+          - const: chrome
+            title: Chrome
+            description: Chrome-plated or chrome-clad alloy wheel
+          - const: forged_alloy
+            title: Forged Alloy
+          - const: mixed
+            title: Mixed Materials
+            since: "1.26"
+            description: >
+              The wheel set combines different constructions or materials,
+              such as forged-alloy outer wheels and steel inner wheels on a
+              dual-rear-wheel truck. Preserve the OEM composition in the wheel
+              option name; this value identifies a known heterogeneous set.
+          - const: carbon_fiber
+            title: Carbon Fiber
+
+      tire_size:
+        type: string
+        description: Tire size in standard format, e.g. "225/65R17"
+
+      tire_type:
+        since: "1.3"
+        description: >
+          Tire compound and construction class. Folds compound (summer /
+          all-season / winter / all-terrain / mud-terrain) and runflat
+          construction into a single classification because the two pieces
+          are co-published on every wheel option that distinguishes them
+          (e.g. BMW's "Summer Runflat" vs "All Season Runflat" trims of the
+          same wheel design). Splitting into separate `tire_compound` and
+          `runflat` attributes would make the runflat half a single-value
+          flag with no cluster mate. Omit when the OEM does not publish a
+          tire-class distinction for the wheel set.
+        oneOf:
+          - const: summer
+            title: Summer
+            description: Warm-weather performance compound, no runflat
+          - const: summer_runflat
+            title: Summer Runflat
+            description: Warm-weather performance compound with runflat construction
+          - const: all_season
+            title: All-Season
+          - const: all_season_runflat
+            title: All-Season Runflat
+          - const: winter
+            title: Winter
+            description: Dedicated winter / snow tire (3PMSF rated)
+          - const: all_terrain
+            title: All-Terrain
+            description: Light off-road tread; common on truck and SUV trims
+          - const: mud_terrain
+            title: Mud-Terrain
+            description: Aggressive off-road tread
+
+      spare:
+        description: Spare tire type. Omit if none provided.
+        oneOf:
+          - const: full_size
+            title: Full-Size Spare
+          - const: temporary
+            title: Temporary (Compact) Spare
+          - const: tire_repair_kit
+            title: Tire Repair Kit
+            description: Sealant and inflator, no physical spare
+
+  # ── Body / Trim ──────────────────────────────
+  roof_rails:
+    description: Roof rail type. Omit if not equipped.
+    oneOf:
+      - const: black
+        title: Black Roof Rails
+      - const: silver
+        title: Silver Roof Rails
+      - const: body_color
+        title: Body-Color Roof Rails
+
+  moonroof:
+    description: Moonroof/sunroof type. Omit if not equipped.
+    oneOf:
+      - const: tilt_slide
+        title: Tilt/Slide Moonroof
+      - const: panoramic
+        title: Panoramic Moonroof
+      - const: panoramic_fixed
+        title: Fixed Panoramic Roof
+        description: Non-opening glass roof
+      - const: panoramic_electrochromic
+        title: Electrochromic Panoramic Moonroof
+        since: "1.5"
+        description: >
+          Opening panoramic glass roof with switchable or dimmable
+          electrochromic/light-control glass.
+      - const: panoramic_fixed_electrochromic
+        title: Fixed Electrochromic Panoramic Roof
+        since: "1.5"
+        description: >
+          Non-opening panoramic glass roof with switchable or dimmable
+          electrochromic/light-control glass.
+
+  side_door_count:
+    since: "1.14"
+    type: integer
+    minimum: 1
+    description: >
+      Number of doors on the vehicle's left and right sides, including
+      sliding and rear-hinged access doors. Excludes liftgates, hatchbacks,
+      tailgates, and rear cargo doors. This avoids the regional ambiguity of
+      marketing terms such as "3-door" and "5-door," which count a rear hatch.
+
+  door_handles:
+    type: object
+    additionalProperties: false
+    properties:
+      type:
+        description: Door handle mechanism
+        oneOf:
+          - const: conventional
+            title: Conventional
+            description: Standard protruding door handles
+          - const: flush
+            title: Flush
+            description: Retractable handles that sit flush with the body
+      finish:
+        description: Door handle finish
+        oneOf:
+          - const: black
+            title: Black
+          - const: gloss_black
+            title: Gloss Black
+          - const: body_color
+            title: Body Color
+          - const: chrome
+            title: Chrome
+
+  liftgate:
+    description: Rear hatch/liftgate operation
+    applicability:
+      body_style: [suv, crossover, hatchback, wagon, minivan, van]
+    oneOf:
+      - const: manual
+        title: Manual
+      - const: power
+        title: Power Liftgate
+      - const: hands_free
+        title: Hands-Free Power Liftgate
+        description: Kick-sensor activated
+
+  sliding_doors:
+    description: >
+      Power sliding side door capability. Omit if not equipped
+      or if doors are manual-only.
+    applicability:
+      body_style: [minivan, van]
+    oneOf:
+      - const: power_one_side
+        title: Single Power Sliding Door
+        description: Power operation on one side (typically passenger side)
+      - const: power_both
+        title: Dual Power Sliding Doors
+      - const: hands_free_one_side
+        title: Single Hands-Free Power Sliding Door
+        description: Hands-free operation on one side with kick sensor
+      - const: hands_free_both
+        title: Dual Hands-Free Power Sliding Doors
+
+  tailgate:
+    description: Truck tailgate type
+    applicability:
+      body_style: [truck]
+    oneOf:
+      - const: basic
+        title: Basic
+      - const: damped
+        title: Damped
+        description: Slow-lowering damped tailgate
+      - const: multi_function
+        title: Multi-Function
+        description: Split or multi-position tailgate (e.g. Ram Multifunction)
+      - const: power
+        title: Power Tailgate
+
+  cab:
+    type: object
+    additionalProperties: false
+    since: "1.2"
+    description: >
+      Truck cab configuration. Use the canonical `style` for cross-make
+      comparison and applicability gating; use `name` to preserve the
+      OEM marketing label (e.g. "CrewMax", "SuperCrew", "Mega Cab").
+
+      Inheritance follows the standard model -> trim -> configuration chain.
+      Set `cab` at the trim level for trims where the cab is fixed; set it
+      at the configuration level when cab is a configuration axis. The
+      canonical `style` is comparable across makes; the marketing `name`
+      mirrors the OEM-branded value used in the `cab` axis label when
+      cab varies.
+    applicability:
+      body_style: [truck, cab_chassis]
+    required: [style]
+    properties:
+      style:
+        description: Canonical cab classification, comparable across makes.
+        oneOf:
+          - const: regular
+            title: Regular Cab
+            description: >
+              Single row of seats with no rear doors. Common on
+              work trucks and base HD trims.
+          - const: extended
+            title: Extended Cab
+            description: >
+              Reduced rear seating, often with smaller rear-hinged
+              doors or full doors but a shorter cabin. Includes
+              Toyota Double Cab, Ford SuperCab, Ram Quad Cab, and
+              Chevrolet/GMC Double Cab.
+          - const: crew
+            title: Crew Cab
+            description: >
+              Full four-door cab with full-size rear seating. Includes
+              Toyota CrewMax, Ford SuperCrew, Ram Crew Cab, and
+              Chevrolet/GMC Crew Cab.
+          - const: mega
+            title: Mega Cab
+            description: >
+              Oversized crew cab with extended rear seat space.
+              Currently Ram-specific (Mega Cab).
+      name:
+        type: string
+        description: >
+          OEM marketing name for this cab, free-form to preserve OEM
+          branding (e.g. "CrewMax", "SuperCrew", "Double Cab",
+          "Mega Cab"). Optional; omit when the OEM uses the canonical
+          name (e.g. plain "Crew Cab").
+
+  bed_material:
+    description: Truck bed material
+    applicability:
+      body_style: [truck]
+    oneOf:
+      - const: steel
+        title: Steel
+      - const: aluminum
+        title: Aluminum
+        description: Lightweight aluminum bed (e.g. Ford F-150)
+      - const: composite
+        title: Composite
+        description: Lightweight composite bed (e.g. GM CarbonPro)
+
+  bed_liner:
+    description: Factory bed liner. Omit if not equipped.
+    applicability:
+      body_style: [truck]
+    oneOf:
+      - const: drop_in
+        title: Drop-In Bedliner
+        description: Molded plastic bed liner installed as a separate insert
+      - const: spray_in
+        title: Spray-In Bedliner
+        description: Factory-applied spray-in bedliner
+
+  bed_features:
+    since: "1.6"
+    type: array
+    uniqueItems: true
+    description: >
+      Factory truck-bed utility features beyond bed material, liner,
+      outlet capacity, and tailgate type. Omit dealer/port accessories
+      that are not part of the factory bed equipment.
+    applicability:
+      body_style: [truck]
+    items:
+      type: string
+      oneOf:
+        - const: bed_lighting
+          title: Bed Lighting
+          description: Integrated cargo-bed lighting for loading or work-area illumination
+        - const: deck_rail_tie_downs
+          title: Deck Rail Tie-Down System
+          description: >
+            Adjustable bed rail, cleat, or track system for securing
+            cargo tie-down points.
+
+  bed_power_outlet_watts:
+    type: integer
+    exclusiveMinimum: 0
+    description: >
+      Peak output of the in-bed 120V AC outlet in watts. Omit if no
+      bed outlet is equipped. Common tiers: 400 W (light-duty),
+      2000 W and 2400 W (moderate), 7200 W (Ford Pro Power Onboard
+      7.2 kW, Silverado EV, F-150 Lightning). Complements
+      interior.power_outlets.household_115v (which tracks outlet
+      locations) by capturing the bed outlet's capacity, which is a
+      headline truck spec.
+    applicability:
+      body_style: [truck]
+
+  hitch:
+    type: object
+    additionalProperties: false
+    description: >
+      Factory trailer hitch equipment. Omit if no factory hitch is
+      equipped. Separate from max_towing_lbs (capacity rating in
+      dimensions.schema.yaml) — hitch describes the installed
+      hardware, capacity describes the vehicle's rating.
+    applicability:
+      body_style: [truck, suv, crossover, van, minivan, cab_chassis]
+    properties:
+      class:
+        description: >
+          Hitch class per SAE J684 trailer weight capacity rating.
+        oneOf:
+          - const: i
+            title: Class I
+            description: Up to 2,000 lbs
+          - const: ii
+            title: Class II
+            description: Up to 3,500 lbs
+          - const: iii
+            title: Class III
+            description: Up to 8,000 lbs
+          - const: iv
+            title: Class IV
+            description: Up to 10,000 lbs
+          - const: v
+            title: Class V
+            description: Up to 20,000 lbs
+      receiver_size_in:
+        type: number
+        exclusiveMinimum: 0
+        description: Receiver tube opening size in inches (e.g. 2, 2.5, 3)
+      wiring:
+        description: Trailer wiring connector equipped
+        oneOf:
+          - const: 4_pin
+            title: 4-Pin Flat
+          - const: 7_pin
+            title: 7-Pin Round
+          - const: 4_and_7_pin
+            title: 4-Pin + 7-Pin
+
+  soft_close_doors:
+    type: array
+    uniqueItems: true
+    description: >
+      Door rows equipped with soft-close (power-cinching) latches.
+      Omit if not equipped. Positions are additive — a vehicle with
+      soft-close on both rows lists both.
+    items:
+      type: string
+      enum: [front, rear]
+
+  convertible_top:
+    description: Convertible top type
+    applicability:
+      body_style: [convertible]
+    oneOf:
+      - const: soft_top_manual
+        title: Manual Soft Top
+      - const: soft_top_power
+        title: Power Soft Top
+      - const: hard_top_retractable
+        title: Retractable Hard Top
+      - const: targa
+        title: Targa Top
+
+  running_boards:
+    description: Running boards or side steps. Omit if not equipped.
+    applicability:
+      body_style: [truck, suv, crossover, van]
+    oneOf:
+      - const: fixed
+        title: Fixed Running Boards
+        description: Non-retractable running boards or molded side steps
+      - const: tubular
+        title: Tubular Side Steps
+        description: Round or oval tube-style side steps
+      - const: retractable_power
+        title: Power Retractable Running Boards
+        description: Electrically deployed running boards that retract when doors close
+
+  badging_style:
+    description: Exterior badge/emblem finish
+    oneOf:
+      - const: chrome
+        title: Chrome
+      - const: black
+        title: Black
+      - const: gloss_black
+        title: Gloss Black
+
+
+  roof_color:
+    type: string
+    description: >
+      Contrasting roof color for two-tone vehicles.
+      Omit if roof matches body. Free-form since values
+      are OEM-specific (e.g. "black", "silver", "white").

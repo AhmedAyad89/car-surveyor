@@ -1,0 +1,76 @@
+# OpenSpec per-make lineup registry (data/{market}/{make}/lineup.yaml).
+#
+# The lineup registry is the HUMAN-owned endorsement surface plus the
+# model-lineup completeness assertion for one make in one market:
+#
+#   - Cells (model x model-year) carry the release-approval state. The
+#     `approved` flip is a human act — population/agent tooling must never
+#     write this file (CI-enforced; CODEOWNERS once the repo is public).
+#   - The registry doubles as the lineup-completeness assertion: a cell
+#     with no corresponding data file is a visible gap from which a stub
+#     can be generated (`openspec lineup stubs`).
+#
+# See docs/lifecycle-and-approval.md for the workflow.
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "lineup.schema.yaml"
+title: OpenSpec Lineup Registry
+type: object
+required: [market, make, models]
+additionalProperties: false
+
+properties:
+  market:
+    type: string
+    pattern: "^[a-z][a-z0-9_]*$"
+    description: Market slug matching the directory (e.g. "us").
+
+  make:
+    type: string
+    pattern: "^[a-z][a-z0-9_]*$"
+    description: Make slug matching the directory (e.g. "hyundai").
+
+  models:
+    type: object
+    description: >
+      Keys are model slugs (directory names). Values map model year to the
+      cell's approval state. Record at model-x-year cells; act at year rows.
+    propertyNames:
+      pattern: "^[a-z0-9][a-z0-9_]*$"
+    additionalProperties:
+      type: object
+      description: Model-year cells for one model lineage.
+      propertyNames:
+        pattern: "^[0-9]{4}(_5)?$"
+      additionalProperties:
+        type: string
+        enum: [unapproved, approved, hold]
+        description: >
+          unapproved = default; not human-endorsed, excluded from release
+          artifacts. approved = human-endorsed; included in the release
+          artifact and every derived surface. hold = explicitly withheld
+          (e.g. a per-model exception inside an otherwise-approved year row).
+
+  approvals:
+    type: array
+    description: >
+      Append-only audit log of approval actions. Each entry records one
+      human decision at whatever scope the review session actually covered.
+    items:
+      type: object
+      required: [scope, at]
+      additionalProperties: false
+      properties:
+        scope:
+          type: string
+          description: >
+            Human-readable scope of the action, e.g. "2021-2026",
+            "ioniq_5 2022-2026", or "elantra 2024: hold".
+        at:
+          type: string
+          format: date
+        action:
+          type: string
+          enum: [approve, hold, revoke]
+          description: Defaults to approve when omitted.
+        notes:
+          type: string

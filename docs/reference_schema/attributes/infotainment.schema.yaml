@@ -1,0 +1,310 @@
+# OpenSpec Infotainment Attributes
+# Audio, display, connectivity, and entertainment systems.
+# Omit any attribute that is not equipped on this trim/config.
+
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://openspec.visor.vin/schema/attributes/infotainment.json
+title: Infotainment Attributes
+type: object
+additionalProperties: false
+
+properties:
+
+  # ── Display ──────────────────────────────────
+  display:
+    type: object
+    additionalProperties: false
+    properties:
+      size_in:
+        type: number
+        exclusiveMinimum: 0
+        description: Primary infotainment display diagonal in inches
+
+      type:
+        description: Primary infotainment display technology
+        oneOf:
+          - const: lcd
+            title: LCD (Non-Touch)
+            description: Non-touchscreen LCD/TFT display
+          - const: lcd_touchscreen
+            title: LCD Touchscreen
+            description: Standard LCD touchscreen
+          - const: oled_touchscreen
+            title: OLED Touchscreen
+            description: OLED touchscreen display
+
+  front_passenger_display:
+    since: "1.8"
+    type: object
+    additionalProperties: false
+    description: >
+      Dedicated front passenger infotainment display, separate from the
+      primary center display. Omit if not equipped.
+    properties:
+      size_in:
+        type: number
+        exclusiveMinimum: 0
+        description: Front passenger display diagonal in inches
+
+      type:
+        description: Front passenger display technology
+        oneOf:
+          - const: lcd_touchscreen
+            title: LCD Touchscreen
+            description: LCD touchscreen dedicated to the front passenger
+          - const: oled_touchscreen
+            title: OLED Touchscreen
+            description: OLED touchscreen dedicated to the front passenger
+
+  instrument_cluster:
+    type: object
+    additionalProperties: false
+    description: Driver instrument cluster
+    properties:
+      type:
+        description: Instrument cluster type
+        oneOf:
+          - const: analog
+            title: Analog Gauges
+          - const: analog_with_display
+            title: Analog with Information Display
+            description: Traditional gauges with small TFT between them
+          - const: digital
+            title: Digital Cluster
+            description: Fully digital/reconfigurable instrument cluster
+      size_in:
+        type: number
+        exclusiveMinimum: 0
+        description: >
+          Display size in inches. Omit for analog-only clusters.
+
+  head_up_display:
+    description: HUD type. Omit if not equipped.
+    oneOf:
+      - const: windshield
+        title: Windshield HUD
+        description: Projects onto the windshield
+      - const: combiner
+        title: Combiner HUD
+        description: Projects onto a small pop-up panel
+
+  # ── Audio ────────────────────────────────────
+  audio:
+    type: object
+    additionalProperties: false
+    properties:
+      speakers:
+        type: integer
+        minimum: 1
+        description: Total speaker count
+
+      system:
+        description: >
+          Premium/branded audio system. The key is generic; the value
+          is the canonical slug for the audio brand. Omit if the
+          vehicle has a generic OEM audio system with no third-party
+          branding. Speaker count, tier names ("Premium", "Reference"),
+          and channel layouts are not encoded here — those belong in
+          a future audio.tier or audio.channels field if demand
+          materializes.
+        oneOf:
+          - const: jbl
+            title: JBL
+            description: Harman-owned premium audio brand
+          - const: harman_kardon
+            title: Harman Kardon
+            description: Harman-owned premium audio brand
+          - const: mark_levinson
+            title: Mark Levinson
+            description: Harman-owned high-end audio brand (Lexus)
+          - const: revel
+            title: Revel
+            description: Harman-owned high-end audio brand (Lincoln)
+          - const: infinity
+            title: Infinity
+            description: Harman-owned audio brand
+          - const: lexicon
+            title: Lexicon
+            description: Harman-owned high-end audio brand (Hyundai/Genesis)
+          - const: akg
+            title: AKG
+            description: Harman-owned premium audio brand (GM/Cadillac)
+          - const: bose
+            title: Bose
+          - const: bang_olufsen
+            title: Bang & Olufsen
+          - const: bowers_wilkins
+            title: Bowers & Wilkins
+          - const: meridian
+            title: Meridian
+          - const: burmester
+            title: Burmester
+          - const: naim
+            title: Naim for Bentley
+          - const: focal
+            title: Focal
+          - const: dynaudio
+            title: Dynaudio
+          - const: fender
+            title: Fender
+            description: Volkswagen partnership audio brand
+          - const: sony
+            title: Sony
+          - const: alpine
+            title: Alpine
+          - const: pioneer
+            title: Pioneer
+          - const: klipsch
+            title: Klipsch
+
+      amplifier_watts:
+        type: integer
+        exclusiveMinimum: 0
+        description: >
+          Audio system amplifier output in watts. Omit when the OEM
+          does not publish a wattage figure.
+
+      subwoofers:
+        type: integer
+        minimum: 1
+        description: >
+          Count of dedicated subwoofers in the audio system. Omit
+          if the system has no dedicated subwoofer. Mirrors the
+          `speakers` field pattern — premium systems commonly
+          publish dual-subwoofer configurations.
+
+      surround_format:
+        description: >
+          Multichannel surround audio format supported. Omit for
+          standard stereo playback.
+        oneOf:
+          - const: "5_1"
+            title: 5.1 Surround
+          - const: "7_1"
+            title: 7.1 Surround
+          - const: 3d_surround
+            title: 3D Surround
+            description: >
+              Height-channel surround without explicit Atmos
+              branding (e.g. Bang & Olufsen 3D)
+          - const: dolby_atmos
+            title: Dolby Atmos
+
+  # ── Connectivity ─────────────────────────────
+  connectivity:
+    type: array
+    description: >
+      Smartphone and subscription connectivity features.
+      Omit if no connectivity features equipped.
+    items:
+      type: string
+      oneOf:
+        - const: apple_carplay_wired
+          title: Apple CarPlay (Wired)
+        - const: apple_carplay_wireless
+          title: Apple CarPlay (Wireless)
+        - const: android_auto_wired
+          title: Android Auto (Wired)
+        - const: android_auto_wireless
+          title: Android Auto (Wireless)
+        - const: siriusxm
+          title: SiriusXM Satellite Radio
+        - const: hd_radio
+          title: HD Radio
+        - const: bluetooth_audio
+          title: Bluetooth Audio Streaming
+        - const: bluetooth_phone
+          title: Bluetooth Phone Connectivity
+        - const: wifi_hotspot
+          title: Built-In Wi-Fi Hotspot
+        - const: navigation
+          title: Built-In Navigation
+          description: Embedded navigation system with offline maps
+        - const: aux_input
+          title: Auxiliary Input
+          description: 3.5mm auxiliary audio input jack
+        - const: connected_navigation
+          title: Connected Navigation
+          description: Cloud-connected navigation with live traffic
+
+  software_updates:
+    since: "1.17"
+    description: >
+      Highest factory-supported over-the-air software update scope. Omit
+      ordinary map/content downloads and dealer-installed updates. Do not
+      interpret vehicle_systems as a claim that every vehicle controller can
+      be updated remotely.
+    oneOf:
+      - const: infotainment_only
+        title: Infotainment OTA Updates
+        description: >
+          Updates are limited to the infotainment system and its integrated
+          applications or services.
+      - const: vehicle_systems
+        title: Vehicle-System OTA Updates
+        description: >
+          The OEM supports remote updates to at least one non-infotainment
+          vehicle controller or system.
+
+  # ── Telematics ───────────────────────────────
+  connected_services:
+    description: >
+      OEM connected services / telematics platform. The key is
+      generic; the value is the canonical slug for the OEM platform
+      name. Omit if the vehicle has no embedded connected services.
+    oneOf:
+      - const: toyota_connected_services
+        title: Toyota Connected Services
+      - const: lexus_connected_services
+        title: Lexus Connected Services
+      - const: hondalink
+        title: HondaLink
+      - const: acuralink
+        title: AcuraLink
+      - const: subaru_starlink
+        title: Subaru STARLINK
+      - const: nissanconnect
+        title: NissanConnect
+      - const: infiniti_intouch
+        title: Infiniti InTouch Services
+      - const: mazda_connected_services
+        title: Mazda Connected Services
+      - const: hyundai_bluelink
+        title: Hyundai Bluelink
+      - const: kia_connect
+        title: Kia Connect
+      - const: genesis_connected_services
+        title: Genesis Connected Services
+      - const: fordpass_connect
+        title: FordPass Connect
+      - const: lincoln_way
+        title: Lincoln Way
+      - const: onstar
+        title: OnStar
+        description: GM connected services platform
+      - const: mopar_connect
+        title: Mopar Connect
+        description: >
+          Stellantis connected services platform
+          (Chrysler, Dodge, Jeep, Ram, Fiat, Alfa Romeo)
+      - const: vw_car_net
+        title: VW Car-Net
+      - const: audi_connect
+        title: Audi connect
+      - const: porsche_connect
+        title: Porsche Connect
+      - const: bmw_connected_drive
+        title: BMW ConnectedDrive
+      - const: mercedes_me_connect
+        title: Mercedes me connect
+      - const: volvo_on_call
+        title: Volvo On Call
+      - const: polestar_connect
+        title: Polestar Connect
+      - const: rivian_connect
+        title: Rivian Connect+
+      - const: tesla_premium_connectivity
+        title: Tesla Premium Connectivity
+        description: Tesla's connected services platform
+      - const: mitsubishi_connect
+        title: Mitsubishi Connect

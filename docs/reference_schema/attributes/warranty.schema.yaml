@@ -1,0 +1,147 @@
+# OpenSpec Warranty Attributes
+# Manufacturer warranty and complimentary coverage terms as published
+# for the market and model year. Warranty terms primarily vary by make
+# (and occasionally by model or powertrain), which makes them cross-make
+# comparison data even when they do not vary across trims. Author them
+# at the model level in the common case; use trim/configuration overrides
+# only when the OEM publishes a different term for a specific variant.
+#
+# Each coverage term is an object with the published duration:
+#   years — coverage term in years
+#   miles — coverage mileage cap. Omit when the OEM publishes the term
+#           with no mileage limit ("unlimited miles"): the absent key is
+#           the absence of a cap, consistent with omit-means-not-equipped.
+
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://openspec.visor.vin/schema/attributes/warranty.json
+title: Warranty Attributes
+type: object
+additionalProperties: false
+
+properties:
+
+  basic:
+    type: object
+    additionalProperties: false
+    required: [years]
+    description: >
+      Basic ("bumper-to-bumper") new-vehicle limited warranty.
+      Example: 4 years / 50,000 miles.
+    properties:
+      years:
+        type: integer
+        exclusiveMinimum: 0
+        description: Coverage term in years
+      miles:
+        type: integer
+        exclusiveMinimum: 0
+        description: Coverage mileage cap. Omit when the OEM publishes no mileage limit.
+
+  powertrain:
+    type: object
+    additionalProperties: false
+    required: [years]
+    description: >
+      Powertrain limited warranty covering engine, transmission, and
+      drive systems. Example: 10 years / 100,000 miles.
+    properties:
+      years:
+        type: integer
+        exclusiveMinimum: 0
+        description: Coverage term in years
+      miles:
+        type: integer
+        exclusiveMinimum: 0
+        description: Coverage mileage cap. Omit when the OEM publishes no mileage limit.
+
+  corrosion:
+    type: object
+    additionalProperties: false
+    required: [years]
+    description: >
+      Corrosion / rust-through perforation warranty. Frequently
+      published with no mileage limit — omit miles in that case.
+    properties:
+      years:
+        type: integer
+        exclusiveMinimum: 0
+        description: Coverage term in years
+      miles:
+        type: integer
+        exclusiveMinimum: 0
+        description: Coverage mileage cap. Omit when the OEM publishes no mileage limit.
+
+  roadside_assistance:
+    type: object
+    additionalProperties: false
+    required: [years]
+    description: >
+      Complimentary roadside assistance program term.
+    properties:
+      years:
+        type: integer
+        exclusiveMinimum: 0
+        description: Coverage term in years
+      miles:
+        type: integer
+        exclusiveMinimum: 0
+        description: Coverage mileage cap. Omit when the OEM publishes no mileage limit.
+
+  battery:
+    type: object
+    additionalProperties: false
+    required: [years]
+    description: >
+      High-voltage battery warranty. For BEVs and PHEVs this is the
+      EV battery warranty (commonly 8 years / 100,000 miles, with
+      variation above that floor); for hybrids it is the separately
+      published hybrid battery term.
+    applicability:
+      engine.type: [bev, phev, hybrid, mild_hybrid, hydrogen]
+    properties:
+      years:
+        type: integer
+        exclusiveMinimum: 0
+        description: Coverage term in years
+      miles:
+        type: integer
+        exclusiveMinimum: 0
+        description: Coverage mileage cap. Omit when the OEM publishes no mileage limit.
+
+  hybrid_component:
+    type: object
+    additionalProperties: false
+    required: [years]
+    description: >
+      Hybrid/electrified component warranty distinct from the
+      high-voltage battery term (e.g., a hybrid system warranty of
+      8 years / 100,000 miles alongside a 10 year / 150,000 mile
+      hybrid battery term).
+    applicability:
+      engine.type: [phev, hybrid, mild_hybrid, hydrogen]
+    properties:
+      years:
+        type: integer
+        exclusiveMinimum: 0
+        description: Coverage term in years
+      miles:
+        type: integer
+        exclusiveMinimum: 0
+        description: Coverage mileage cap. Omit when the OEM publishes no mileage limit.
+
+  complimentary_maintenance:
+    type: object
+    additionalProperties: false
+    required: [years]
+    description: >
+      Complimentary factory scheduled maintenance program included
+      with the vehicle (e.g., ToyotaCare, BMW Ultimate Care).
+    properties:
+      years:
+        type: integer
+        exclusiveMinimum: 0
+        description: Program term in years
+      miles:
+        type: integer
+        exclusiveMinimum: 0
+        description: Program mileage cap. Omit when the OEM publishes no mileage limit.

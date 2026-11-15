@@ -1,0 +1,624 @@
+# OpenSpec Interior Attributes
+# Seating, steering, climate, convenience, and cabin equipment.
+# Omit any attribute that is not equipped on this trim/config.
+
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://openspec.visor.vin/schema/attributes/interior.json
+title: Interior Attributes
+type: object
+additionalProperties: false
+
+properties:
+
+  surfaces:
+    since: "1.11"
+    type: object
+    minProperties: 1
+    additionalProperties: false
+    description: >
+      Sparse, source-backed physical cabin surfaces. Each fixed slot may carry
+      an optional material, fixed color or palette role, finish, and pattern.
+      Omission means unknown. A configuration that restates a slot replaces
+      the inherited slot wholesale.
+    properties:
+      seats: &surface_slot
+        type: object
+        minProperties: 1
+        additionalProperties: false
+        properties:
+          material:
+            type: object
+            minProperties: 1
+            additionalProperties: false
+            properties:
+              family:
+                type: string
+                enum: [cloth, vinyl, synthetic_leather, leather, microfiber,
+                       wood, metal, carbon_fiber]
+              grade:
+                type: string
+                enum: [nappa, semi_aniline]
+              oem_name:
+                type: string
+                minLength: 1
+          color:
+            type: object
+            minProperties: 1
+            additionalProperties: false
+            required: [base_color]
+            properties:
+              base_color:
+                type: string
+                enum: [black, white, silver, gray, red, blue, green, yellow,
+                       orange, brown, tan, beige, gold, purple, burgundy]
+              oem_name:
+                type: string
+                minLength: 1
+          color_role:
+            type: string
+            enum: [primary, secondary, accent]
+          finish:
+            type: string
+            enum: [perforated, quilted, open_pore, gloss, matte, brushed, polished]
+          pattern:
+            type: string
+            minLength: 1
+        not:
+          required: [color, color_role]
+      seat_inserts: *surface_slot
+      stitching: *surface_slot
+      dashboard: *surface_slot
+      dashboard_inlay: *surface_slot
+      door_panels: *surface_slot
+      door_inlays: *surface_slot
+      center_console: *surface_slot
+      headliner: *surface_slot
+      seatbelts: *surface_slot
+
+  # ── Seating ──────────────────────────────────
+  second_row_type:
+    description: >
+      Second-row seating type. Omit for vehicles without a
+      configurable second row.
+    applicability:
+      body_style: [suv, crossover, minivan, van, truck, wagon]
+    oneOf:
+      - const: bench
+        title: Bench Seat
+      - const: split_bench
+        title: Split Bench
+        description: Bench seat that splits into individual positions with fold-down armrest
+      - const: captain
+        title: Captain's Chairs
+        description: Individual second-row bucket seats with center pass-through
+
+  third_row_type:
+    description: Third-row seating type. Omit for vehicles without a third row.
+    applicability:
+      body_style: [suv, crossover, minivan, van]
+    oneOf:
+      - const: bench
+        title: Bench Seat
+      - const: captain
+        title: Captain's Chairs
+        description: Individual third-row bucket seats
+      - const: removable
+        title: Removable
+        description: Seats can be fully removed from vehicle
+      - const: stow_in_floor
+        title: Stow-in-Floor
+        description: Seats fold flat into floor cavity (e.g. Stow 'n Go)
+
+  seat_heating:
+    type: array
+    description: Seating rows with heating equipped. Omit if none.
+    items:
+      type: string
+      enum: [front, second_row, second_row_outboard, third_row]
+
+  seat_ventilation:
+    type: array
+    description: Seating rows with ventilation equipped. Omit if none.
+    items:
+      type: string
+      enum: [front, second_row, second_row_outboard]
+
+  seat_massage:
+    type: array
+    description: Seating rows with massage equipped. Omit if none.
+    items:
+      type: string
+      enum: [front, second_row, second_row_outboard]
+
+  seat_leg_support:
+    since: "1.6"
+    type: array
+    description: >
+      Seating rows with ottomans, extendable leg rests, or calf supports.
+      Omit if none.
+    items:
+      type: string
+      enum: [front, second_row, second_row_outboard]
+
+  seat_adjustment_driver:
+    description: Driver seat adjustment type
+    oneOf:
+      - const: manual
+        title: Manual
+      - const: 2_way_power
+        title: 2-Way Power
+        description: Power height adjust only
+      - const: 4_way_power
+        title: 4-Way Power
+      - const: 6_way_power
+        title: 6-Way Power
+      - const: 8_way_power
+        title: 8-Way Power
+      - const: 10_way_power
+        title: 10-Way Power
+      - const: 12_way_power
+        title: 12-Way Power
+      - const: 14_way_power
+        title: 14-Way Power
+      - const: 16_way_power
+        title: 16-Way Power
+      - const: 18_way_power
+        title: 18-Way Power
+      - const: 20_way_power
+        title: 20-Way Power
+
+  seat_adjustment_passenger:
+    description: Front passenger seat adjustment type
+    oneOf:
+      - const: manual
+        title: Manual
+      - const: 2_way_power
+        title: 2-Way Power
+        description: Power height adjust only
+      - const: 4_way_power
+        title: 4-Way Power
+      - const: 6_way_power
+        title: 6-Way Power
+      - const: 8_way_power
+        title: 8-Way Power
+      - const: 10_way_power
+        title: 10-Way Power
+      - const: 12_way_power
+        title: 12-Way Power
+      - const: 14_way_power
+        title: 14-Way Power
+      - const: 16_way_power
+        title: 16-Way Power
+      - const: 18_way_power
+        title: 18-Way Power
+      - const: 20_way_power
+        title: 20-Way Power
+
+  lumbar_support_driver:
+    description: Driver lumbar support type. Omit if not equipped.
+    oneOf:
+      - const: manual
+        title: Manual Lumbar
+      - const: 2_way_power
+        title: 2-Way Power Lumbar
+      - const: 4_way_power
+        title: 4-Way Power Lumbar
+
+  lumbar_support_passenger:
+    description: Front passenger lumbar support type. Omit if not equipped.
+    oneOf:
+      - const: manual
+        title: Manual Lumbar
+      - const: 2_way_power
+        title: 2-Way Power Lumbar
+      - const: 4_way_power
+        title: 4-Way Power Lumbar
+
+  seat_memory_driver:
+    type: integer
+    minimum: 1
+    maximum: 3
+    description: >
+      Number of driver seat memory positions. Also include driver in
+      seat_memory so presence remains queryable when comparing vehicles
+      whose OEMs do not publish a position count.
+
+  seat_memory_passenger:
+    type: integer
+    minimum: 1
+    maximum: 3
+    description: >
+      Number of front passenger seat memory positions. Also include
+      front_passenger in seat_memory.
+
+  seat_memory:
+    since: "1.17"
+    type: array
+    uniqueItems: true
+    description: >
+      Seating positions equipped with memory. Populate this presence array
+      whether or not the OEM publishes the number of stored positions; use
+      seat_memory_driver or seat_memory_passenger as optional count detail.
+    items:
+      type: string
+      oneOf:
+        - const: driver
+          title: Driver Seat
+        - const: front_passenger
+          title: Front Passenger Seat
+
+  second_row_fold:
+    description: Second-row seat folding configuration
+    oneOf:
+      - const: "50_50"
+        title: 50/50 Split-Fold
+      - const: "60_40"
+        title: 60/40 Split-Fold
+      - const: "40_20_40"
+        title: 40/20/40 Split-Fold
+      - const: "35_30_35"
+        title: 35/30/35 Split-Fold
+      - const: "40_60"
+        title: 40/60 Split-Fold
+      - const: "70_30"
+        title: 70/30 Split-Fold
+      - const: one_piece
+        title: One-Piece Fold
+        description: Non-split fold-down as single unit
+      - const: flat_fold
+        title: Flat-Fold
+        description: Full bench folds flat
+      - const: fixed
+        title: Fixed
+        description: Non-folding rear seats
+
+  third_row_fold:
+    description: Third-row seat folding configuration. Omit if no third row.
+    applicability:
+      body_style: [suv, crossover, minivan, van]
+    oneOf:
+      - const: "50_50"
+        title: 50/50 Split-Fold
+      - const: "60_40"
+        title: 60/40 Split-Fold
+      - const: one_piece
+        title: One-Piece Fold
+      - const: stow_in_floor
+        title: Stow-in-Floor
+        description: Seats fold flat into floor cavity
+      - const: removable
+        title: Removable
+        description: Seats physically removed from vehicle
+      - const: power_fold
+        title: Power-Folding
+        description: Electrically powered fold-flat
+      - const: fixed
+        title: Fixed
+
+  rear_seat_recline:
+    description: Rear seatback recline adjustment type. Omit if not equipped.
+    oneOf:
+      - const: manual
+        title: Manual Recline
+      - const: power
+        title: Power Recline
+
+  power_adjustable_pedals:
+    description: Power-adjustable accelerator and brake pedals. Omit if not equipped.
+    oneOf:
+      - const: basic
+        title: Basic
+        description: Power-adjustable pedals without memory
+      - const: with_memory
+        title: With Memory
+        description: Power-adjustable pedals with memory positions
+
+  # ── Steering ─────────────────────────────────
+  steering_wheel:
+    type: object
+    additionalProperties: false
+    properties:
+      material:
+        oneOf:
+          - const: urethane
+            title: Urethane
+          - const: leather
+            title: Leather
+          - const: leather_wrapped
+            title: Leather-Wrapped
+          - const: wood_leather
+            title: Wood/Leather
+          - const: alcantara
+            title: Alcantara
+          - const: dinamica
+            title: Dinamica
+            description: Microfiber suede alternative to Alcantara
+          - const: carbon_fiber_leather
+            title: Carbon Fiber/Leather
+
+      column_adjustment:
+        description: Steering column adjustment type
+        oneOf:
+          - const: tilt
+            title: Tilt
+          - const: tilt_telescoping
+            title: Tilt/Telescoping
+          - const: power_tilt_telescoping
+            title: Power Tilt/Telescoping
+
+      features:
+        type: array
+        description: Steering wheel features equipped
+        items:
+          type: string
+          enum: [heated, paddle_shifters, audio_controls,
+                 phone_controls, cruise_controls,
+                 driver_display_controls, flat_bottom, memory]
+
+  # ── Gear Selector ───────────────────────────
+  gear_selector:
+    description: Gear selector type
+    oneOf:
+      - const: console_lever
+        title: Console Lever
+        description: Traditional floor-mounted shift lever
+      - const: column_shift
+        title: Column Shift
+      - const: stalk
+        title: Stalk
+        description: Column-mounted stalk selector (common in EVs and Mercedes)
+      - const: electronic_lever
+        title: Electronic Lever
+        description: Shift-by-wire console lever
+      - const: rotary
+        title: Rotary Dial
+      - const: button
+        title: Button Selector
+        description: Push-button gear selection
+      - const: toggle
+        title: Toggle Switch
+        description: Small toggle-style gear selector
+
+  # ── Climate ──────────────────────────────────
+  climate_zones:
+    type: integer
+    minimum: 1
+    maximum: 5
+    description: Number of independent climate zones
+
+  air_filtration:
+    type: array
+    uniqueItems: true
+    description: >
+      Cabin air filtration and purification technologies equipped.
+      Omit if basic particulate filtration only. Multiple technologies
+      may coexist on the same vehicle.
+    items:
+      type: string
+      oneOf:
+        - const: activated_carbon
+          title: Activated Carbon
+          description: Charcoal/activated carbon cabin filter
+        - const: ionizer
+          title: Air Ionizer
+        - const: hepa
+          title: HEPA Filter
+        - const: biodefense
+          title: Biodefense Mode
+          description: Positive-pressure HEPA system
+
+  rear_window_sunshade:
+    description: Rear window shade type. Omit if not equipped.
+    oneOf:
+      - const: manual
+        title: Manual Sunshade
+      - const: power
+        title: Power Sunshade
+
+  rear_side_sunshade:
+    description: Rear side window shade type. Omit if not equipped.
+    oneOf:
+      - const: manual
+        title: Manual Sunshade
+      - const: power
+        title: Power Sunshade
+
+  # ── Visibility / Lighting ────────────────────
+  ambient_lighting:
+    description: Interior ambient lighting type. Omit if not equipped.
+    oneOf:
+      - const: single_color
+        title: Single-Color Ambient Lighting
+      - const: multicolor
+        title: Multi-Color Ambient Lighting
+      - const: multicolor_multizone
+        title: Multi-Color Multi-Zone Ambient Lighting
+
+  sun_visors:
+    description: Sun visor type
+    oneOf:
+      - const: basic
+        title: Basic
+        description: Standard sun visors with vanity mirrors
+      - const: illuminated
+        title: Illuminated
+        description: Vanity mirrors with illumination
+      - const: illuminated_with_extensions
+        title: Illuminated with Extensions
+        description: Illuminated vanity mirrors with sliding extensions
+
+  rearview_mirror:
+    description: Interior rearview mirror
+    type: object
+    additionalProperties: false
+    properties:
+      type:
+        description: Mirror display type
+        oneOf:
+          - const: basic
+            title: Basic
+          - const: digital
+            title: Digital Rearview Mirror
+            description: Camera-based digital display mirror
+      features:
+        type: array
+        description: Rearview mirror features. Omit if no features beyond base mirror.
+        items:
+          type: string
+          enum: [auto_dimming, homelink, compass]
+
+  # ── Convenience ──────────────────────────────
+  keyless_entry:
+    description: >
+      Keyless entry and start system type, from the least to the most
+      capable. Omit if key-only.
+    oneOf:
+      - const: push_button_start
+        title: Push-Button Start
+        since: "1.30"
+        description: >
+          Push-button start while the fob is in the cabin; no remote
+          lock/unlock and no proximity unlock
+      - const: remote
+        title: Remote Keyless Entry
+        description: Key fob lock/unlock
+      - const: remote_push_button_start
+        title: Remote Keyless Entry with Push-Button Start
+        since: "1.29"
+        description: >
+          Key fob lock/unlock without proximity unlock; the engine starts
+          with a push button while the fob is in the cabin
+      - const: smart_key
+        title: Smart Key
+        description: Proximity-based unlock, push-button start
+      - const: digital_key
+        title: Digital Key
+        description: Smartphone or smartwatch-based proximity unlock and start
+
+  remote_start:
+    type: array
+    description: >
+      Remote engine/climate start methods equipped. Omit if not
+      equipped. The delivery mechanism determines whether ongoing
+      connectivity costs apply — key fob remote start works
+      independently of subscriptions, while app-based remote start
+      depends on the vehicle's connected services platform.
+    items:
+      type: string
+      oneOf:
+        - const: key_fob
+          title: Key Fob Remote Start
+          description: >
+            Remote start via dedicated key fob button. Functions
+            independently of cellular service or subscriptions.
+        - const: app
+          title: App-Based Remote Start
+          description: >
+            Remote start via smartphone app through the vehicle's
+            connected services platform. Requires an active
+            connected services subscription on most OEMs.
+
+  power_windows:
+    description: >
+      Power window one-touch auto up/down scope.
+      Omit if no auto up/down on any window.
+    oneOf:
+      - const: driver_only
+        title: Driver Auto Up/Down
+        description: Only driver window has one-touch auto up/down
+      - const: front
+        title: Front Auto Up/Down
+        description: Both front windows have one-touch auto up/down
+      - const: all
+        title: All Auto Up/Down
+        description: All windows have one-touch auto up/down
+
+  wireless_phone_charging:
+    description: >
+      Wireless phone charging pad equipped. Omit if not equipped.
+      Value indicates the charging standard.
+    oneOf:
+      - const: qi
+        title: Qi
+        description: Qi (WPC) wireless charging
+      - const: qi2
+        title: Qi2
+        description: Qi2 (MagSafe-compatible) wireless charging
+
+  auxiliary_switches:
+    type: integer
+    minimum: 1
+    since: "1.5"
+    description: >
+      Count of factory-installed auxiliary/upfitter switches for
+      customer accessory circuits such as lights, radios, winches, or
+      other powered equipment. Omit when the OEM does not publish the
+      switch count, or when switches are dealer-installed accessories
+      rather than factory/port equipment.
+    applicability:
+      body_style: [truck, suv, cab_chassis, van]
+
+  power_outlets:
+    type: object
+    additionalProperties: false
+    description: >
+      Power outlet locations by type. Omit any type not equipped.
+      Omit entire section if no outlets beyond standard 12V front.
+    properties:
+      twelve_volt:
+        type: array
+        items:
+          type: string
+          enum: [front, second_row, cargo, bed]
+      usb_a:
+        type: array
+        items:
+          type: string
+          enum: [front, second_row, third_row, cargo]
+      usb_c:
+        type: array
+        items:
+          type: string
+          enum: [front, second_row, third_row, cargo]
+      household_115v:
+        type: array
+        items:
+          type: string
+          enum: [front, second_row, cargo, bed]
+
+  cargo_cover:
+    description: Cargo area cover type. Omit if not equipped.
+    applicability:
+      body_style: [suv, crossover, wagon]
+    oneOf:
+      - const: retractable
+        title: Retractable Cargo Cover
+      - const: removable
+        title: Removable Cargo Cover
+
+  rear_entertainment:
+    description: >
+      Rear-seat entertainment system. Omit if not equipped.
+    oneOf:
+      - const: single_screen
+        title: Single Rear Screen
+        description: >
+          Single flip-down or center-mounted rear screen
+      - const: dual_screen
+        title: Dual Rear Screens
+        description: Individual headrest-mounted or seatback screens
+      - const: seatback_tablets
+        title: Seatback Tablets
+        description: >
+          Removable tablet-style rear displays (e.g. Chrysler
+          Uconnect Theater)
+
+  refrigerated_compartment:
+    description: >
+      Refrigerated or cooled storage compartment. Omit if not
+      equipped.
+    oneOf:
+      - const: console
+        title: Center Console Cooler
+      - const: rear_console
+        title: Rear Console Cooler
