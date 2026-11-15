@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(~/refdata/**)",
+      "WebFetch(domain:visor.vin)",
+      "WebFetch(domain:*.visor.vin)"
+    ]
+  },
+  "sandbox": {
+    "enabled": true,
+    "failIfUnavailable": true,
+    "allowUnsandboxedCommands": false,
+    "filesystem": {
+      "denyRead": ["~/refdata", "~/refdata/**"],
+      "allowWrite": ["~/.cache/uv", "~/.cache/prek"]
+    },
+    "network": {
+      "deniedDomains": ["visor.vin", "*.visor.vin"]
+    }
+  }
+}
