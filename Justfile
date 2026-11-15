@@ -25,6 +25,10 @@ discover *args:
 snapshot *args:
     uv run car-surveyor snapshot {{args}}
 
+# Read each snapshot once: one model call per document, a parser for the fuel economy file
+extract *args:
+    uv run car-surveyor extract {{args}}
+
 # Count candidate documents by kind and status
 status *args:
     uv run car-surveyor status {{args}}

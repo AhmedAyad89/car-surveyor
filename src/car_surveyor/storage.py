@@ -44,6 +44,65 @@ SCHEMA_STATEMENTS: tuple[str, ...] = (
         document_date DATE
     )
     """,
+    # One row per snapshot and extractor version: the extractor's answer as it
+    # was returned. A stage that finds a row here makes no model call.
+    """
+    CREATE TABLE IF NOT EXISTS extractions (
+        snapshot_sha256 TEXT NOT NULL,
+        extractor_version TEXT NOT NULL,
+        status TEXT NOT NULL,
+        response TEXT NOT NULL,
+        detail TEXT NOT NULL,
+        input_tokens BIGINT NOT NULL,
+        output_tokens BIGINT NOT NULL,
+        cost_usd DOUBLE NOT NULL,
+        extracted_at TIMESTAMP NOT NULL,
+        PRIMARY KEY (snapshot_sha256, extractor_version)
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS style_claims (
+        claim_id TEXT PRIMARY KEY,
+        style_key TEXT NOT NULL,
+        model_year INTEGER NOT NULL,
+        model TEXT NOT NULL,
+        model_code TEXT,
+        grade TEXT,
+        powertrain TEXT,
+        body TEXT,
+        engine TEXT,
+        transmission TEXT,
+        drive TEXT,
+        description TEXT NOT NULL,
+        snapshot_sha256 TEXT NOT NULL,
+        locator TEXT NOT NULL,
+        quote TEXT NOT NULL,
+        extractor_version TEXT NOT NULL,
+        status TEXT NOT NULL,
+        reject_reason TEXT NOT NULL
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS value_claims (
+        claim_id TEXT PRIMARY KEY,
+        style_key TEXT,
+        applies_to TEXT NOT NULL,
+        attribute TEXT NOT NULL,
+        value_text TEXT NOT NULL,
+        value_num DOUBLE,
+        unit TEXT NOT NULL,
+        qualifiers TEXT NOT NULL,
+        hedge_flags TEXT NOT NULL,
+        effective_date DATE,
+        source_class TEXT NOT NULL,
+        snapshot_sha256 TEXT NOT NULL,
+        locator TEXT NOT NULL,
+        quote TEXT NOT NULL,
+        extractor_version TEXT NOT NULL,
+        status TEXT NOT NULL,
+        reject_reason TEXT NOT NULL
+    )
+    """,
 )
 
 
