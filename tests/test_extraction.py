@@ -657,3 +657,18 @@ def test_anthropic_extractor_refuses_an_answer_that_is_not_whole(
     extractor = AnthropicExtractor("claude-opus-5-5", "high", client=client)
     with pytest.raises(ExtractionError, match=message):
         extractor.extract(_request())
+
+
+def test_anthropic_extractor_reads_without_thinking_and_without_a_fallback_on_haiku() -> None:
+    client, messages = _stub_client()
+    extractor = AnthropicExtractor("claude-haiku-5-5", "high", is_thinking=False, client=client)
+
+    extractor.extract(_request())
+
+    assert extractor.label == "claude-haiku-5-5/no-thinking"
+    (call,) = messages.calls
+    assert call["model"] == "claude-haiku-5-5"
+    assert call["thinking"] == {"type": "disabled"}
+    # A Haiku has no server-side fallback; sending one would fail every call.
+    assert call["betas"] is anthropic.omit
+    assert call["fallbacks"] is anthropic.omit

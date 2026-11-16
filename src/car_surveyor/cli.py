@@ -279,6 +279,7 @@ def run_api_extract(
     extractor = extraction.AnthropicExtractor(
         settings.extraction_model,
         settings.extraction_effort,
+        is_thinking=settings.extraction_is_thinking,
         api_key=key.get_secret_value() if key else None,
     )
     try:

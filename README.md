@@ -52,8 +52,13 @@ every held document's text and tables again from its stored bytes, without
 fetching, and `just verify --recheck` checks every claim against the result.
 
 `just extract` calls the Claude API, with the key from `ANTHROPIC_API_KEY` in
-`.env.secret` or an `ant auth login` profile. The model is `claude-opus-5-5` unless
-`CAR_SURVEYOR_EXTRACTION_MODEL` says otherwise. Without credentials, another
+`.env.secret` or an `ant auth login` profile. The model is `claude-haiku-5-5`
+with thinking off, at effort `high`, unless `CAR_SURVEYOR_EXTRACTION_MODEL`,
+`CAR_SURVEYOR_EXTRACTION_IS_THINKING` or `CAR_SURVEYOR_EXTRACTION_EFFORT` say
+otherwise. Opus 5.5, Sonnet 5.5 and Fable models need thinking on, and thinking
+can be off only at effort `high` or below; the command refuses to start
+otherwise. Answers read without thinking are kept apart from answers read with
+it. Without credentials, another
 model runner can read the documents through files:
 
 ```
