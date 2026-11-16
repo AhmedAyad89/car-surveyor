@@ -58,8 +58,13 @@ with thinking off, at effort `high`, unless `CAR_SURVEYOR_EXTRACTION_MODEL`,
 otherwise. Opus 5.5, Sonnet 5.5 and Fable models need thinking on, and thinking
 can be off only at effort `high` or below; the command refuses to start
 otherwise. Answers read without thinking are kept apart from answers read with
-it. Without credentials, another
-model runner can read the documents through files:
+it.
+
+The API reads **price sheets only**, unless `--kind` names other kinds. Spec
+sheets are read by Claude Code agents running Opus, through files, with the
+label `claude-code-opus`: Haiku located their figures too poorly to admit
+([comparison](docs/findings/2026-11-16-haiku-vs-opus-extraction.md)). The same
+route serves any model runner without credentials:
 
 ```
 just extract --export data/extraction --label <runner-name>

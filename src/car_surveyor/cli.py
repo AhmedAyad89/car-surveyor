@@ -132,6 +132,13 @@ def build_parser() -> argparse.ArgumentParser:
         "--import", type=Path, metavar="DIR", dest="import_dir", help="read answer files from DIR"
     )
     extract.add_argument("--label", help="the name of the runner that answers exported requests")
+    extract.add_argument(
+        "--kind",
+        action="append",
+        choices=sorted(extraction.PROMPTS_BY_KIND),
+        help="the kind of document the API reads; repeat for several. Default: "
+        f"{', '.join(extraction.API_KINDS)}. Spec sheets are read through --export/--import",
+    )
     verify = stages.add_parser("verify", help="admit or reject each extracted claim")
     verify.add_argument(
         "--recheck", action="store_true", help="settle every claim again, under the current rules"
@@ -269,11 +276,20 @@ def run_extract(
         report = extraction.import_answers(connection, settings, options.label, options.import_dir)
         print(f"extract (answers from {options.label}): {report.describe()}")
         return 0
-    return run_api_extract(connection, settings, is_retrying_failed=options.retry_failed)
+    return run_api_extract(
+        connection,
+        settings,
+        kinds=tuple(options.kind or extraction.API_KINDS),
+        is_retrying_failed=options.retry_failed,
+    )
 
 
 def run_api_extract(
-    connection: duckdb.DuckDBPyConnection, settings: Settings, *, is_retrying_failed: bool
+    connection: duckdb.DuckDBPyConnection,
+    settings: Settings,
+    *,
+    kinds: tuple[str, ...] = extraction.API_KINDS,
+    is_retrying_failed: bool,
 ) -> int:
     key = settings.anthropic_api_key
     extractor = extraction.AnthropicExtractor(
@@ -284,7 +300,7 @@ def run_api_extract(
     )
     try:
         report = extraction.extract_documents(
-            connection, settings, extractor, is_retrying_failed=is_retrying_failed
+            connection, settings, extractor, kinds=kinds, is_retrying_failed=is_retrying_failed
         )
     except TypeError as error:
         # The SDK raises this, not an API error, when it finds no credentials.

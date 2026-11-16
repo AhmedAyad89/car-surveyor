@@ -261,6 +261,25 @@ def test_extract_documents_turns_an_answer_into_located_claims(
     assert prices[2].locator == TableCell(2, 0, "Example 4x2 Limited", "MSRP")
 
 
+def test_extract_documents_reads_only_the_kinds_it_is_given(
+    connection: duckdb.DuckDBPyConnection,
+    settings: Settings,
+    pricing_snapshot: Snapshot,
+    specification_snapshot: Snapshot,
+) -> None:
+    extractor = FakeExtractor(PRICING_ANSWER)
+    report = extraction.extract_documents(
+        connection, settings, extractor, kinds=extraction.API_KINDS
+    )
+
+    assert report.extracted == [pricing_snapshot.url]
+    assert [request.kind for request in extractor.requests] == [source.PRICING_PDF]
+    status = extraction.find_extraction_status(
+        connection, specification_snapshot.sha256, "fake-model+specification-v1"
+    )
+    assert status is None
+
+
 def test_extract_documents_records_each_delivery_fee_as_a_scoped_claim(
     connection: duckdb.DuckDBPyConnection, settings: Settings, pricing_snapshot: Snapshot
 ) -> None:
