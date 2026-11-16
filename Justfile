@@ -57,6 +57,10 @@ reference-coverage:
 status *args:
     uv run car-surveyor status {{args}}
 
+# Browse the database, the documents and the diff's feedback in a local page (it only reads)
+view *args:
+    uv run car-surveyor view {{args}}
+
 # Tries three routes to the reference: the canary with cat, the canary from a
 # Python script, and openspec.visor.vin with curl. Nothing read or fetched is
 # printed. Exit 0 means every route was blocked, which is what an agent session

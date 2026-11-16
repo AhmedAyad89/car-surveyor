@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>car-surveyor viewer</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="/assets/viewer.css">
+<script src="/assets/viewer.js" defer></script>
+</head>
+<body>
+<header class="top">
+  <h1>car-surveyor <span class="muted">viewer</span></h1>
+  <nav id="tabs" aria-label="Views"></nav>
+  <div class="top-right">
+    <strong id="reference-badge" class="reference-badge" hidden>showing reference values</strong>
+    <span id="data-dir" class="muted mono"></span>
+    <button id="reload" type="button" title="Read the database and the feedback again">Reload</button>
+  </div>
+</header>
+<p id="reference-note" class="notice" hidden></p>
+<div class="workspace">
+  <main id="main" tabindex="-1"></main>
+  <aside id="panel" class="panel" aria-label="Details" hidden>
+    <div class="panel-bar">
+      <h2 id="panel-title"></h2>
+      <button id="panel-close" type="button" title="Close (Escape)">Close</button>
+    </div>
+    <div id="panel-body" class="panel-body"></div>
+  </aside>
+</div>
+<noscript><p class="notice">This page needs JavaScript.</p></noscript>
+</body>
+</html>
