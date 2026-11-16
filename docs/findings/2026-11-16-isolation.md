@@ -15,6 +15,7 @@ rules in it, for the record the rules ask for.
 | Was `visor.vin` fetched? | no |
 | Were `just diff`, `just reference-coverage` or `just isolation-test` run? | no |
 | Was the reference loader run on real reference files? | no |
+| Was the agent guard on the diff or the viewer ever turned off? | once, by a subagent, on a file it reports it made up |
 | Does `~/refdata/CANARY` exist? | no, so `just isolation-test` still cannot judge the file routes |
 
 ## What happened
@@ -44,6 +45,15 @@ rules in it, for the record the rules ask for.
 - **Documents were read by subagents.** Each was told to read only its
   own request files, never `~/refdata/` or any folder named `openspec`,
   and to copy only what its document prints.
+- **A subagent turned the agent guard off once.** While building the
+  viewer, a subagent started it with `CLAUDECODE` unset, to exercise the
+  mode that shows reference values. It reports that the file it passed
+  was one it had generated under `/tmp` from the pipeline's own values
+  with made-up offsets, and that nothing under `~/refdata/` was touched.
+  A second such start was refused by the session's permission check. The
+  main session did not verify the report. The guard is a check of one
+  environment variable, so it stops a mistake and not an attempt. The
+  sandbox is what stops an attempt, and this session had none.
 - **A request was refused for carrying the user's email.** The first
   probe of the session put the user's email address in a User-Agent
   header. The request was blocked before it left. The fetcher identifies
@@ -63,11 +73,25 @@ rules in it, for the record the rules ask for.
 
 ## Open
 
-1. **Pull the main checkout** before starting another session there:
-   `git -C ~/code/car-surveyor pull`. Until then a session started in it
-   has no sandbox.
-2. **Create the canary:** `echo canary > ~/refdata/CANARY`. Then ask an
-   agent in a fresh session to run `just isolation-test`; it must exit 0.
-3. **The tool check** from the S0 finding is still open: ask an agent to
-   try its Read tool on `~/refdata/CANARY` and its WebFetch tool on
-   `openspec.visor.vin`.
+The canary is one file with nothing in it that matters, placed beside
+the reference. It is a tripwire: a session that can read it could read
+the reference. None of this is needed to run the diff. It is needed
+before another agent session works on the project, and before the diff's
+detail output, which holds reference values, sits in `~/refdata/out/`.
+
+1. **Create the canary:** `echo canary > ~/refdata/CANARY`. On
+   2026-11-16 it did not exist (checked by existence only).
+2. **Run the test yourself:** `just isolation-test` from your own
+   terminal in the main checkout. It should print `GOT THROUGH` for each
+   route and exit 1. That is the right result there: it shows the test
+   can tell an open route from a blocked one.
+3. **Have a new agent session run it.** The main checkout holds
+   `.claude/settings.json` as of 2026-11-16, so a session started there
+   should be sandboxed. Ask it to run `just isolation-test`. It must
+   print `blocked` three times and exit 0. Then ask it to try its Read
+   tool on `~/refdata/CANARY` and its WebFetch tool on
+   `openspec.visor.vin`. Both must be refused. If anything gets through,
+   the sandbox is not working and no agent should work on the project
+   until it is.
+4. **Do not have the session that built the pipeline run the test.** It
+   is not sandboxed, so the test would reach the reference's site.
