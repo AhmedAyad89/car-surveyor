@@ -17,6 +17,10 @@ Row matching, in two passes:
 2. **By description**, for reference rows no code matched. The model, drive,
    transmission, powertrain and cylinder count must not contradict, and the
    trim name and cab must share enough words with the style's grade and body.
+   A powertrain or cylinder count is checked only where the style's line
+   tells its styles apart by it: a price list that never names a powertrain
+   says nothing about one, and an engine label every style of a line shares
+   names no style in particular, and may be out of date.
 
 How many rows each pass matched is reported, because a matching error looks
 exactly like a missed style.
@@ -82,6 +86,10 @@ _BED_WORDS = frozenset({"bed", "lb", "sb", "ft", "short", "long"})
 _BED_LENGTH = re.compile(r"\d+ft")
 # Words that say a style's body names a cab.
 _CAB_WORDS = frozenset({"cab", "crewmax"})
+# Words the two sides add to a special edition's name or leave out of it.
+_FILLER_WORDS = frozenset({"special", "edition"})
+# What a style with no grade, or a trim named only by its model, is called.
+_BASE_WORDS = frozenset({"base"})
 _REFERENCE_DRIVES = {
     "fwd": resolution.TWO_WHEEL,
     "rwd": resolution.TWO_WHEEL,
@@ -185,6 +193,14 @@ class PipelineStyle:
     @property
     def is_plug_in(self) -> bool:
         return "prime" in resolution.list_words(self.powertrain or "")
+
+
+@dataclass(frozen=True, slots=True)
+class LineFacts:
+    """Whether a style's line tells its styles apart by powertrain and by cylinder count."""
+
+    is_powertrain_stated: bool = True
+    is_cylinder_count_telling: bool = True
 
 
 @dataclass(frozen=True, slots=True)
@@ -305,6 +321,10 @@ def match_rows(
     for style in pipeline:
         if style.model_code:
             by_code[(style.model_year, style.model_code)].append(style)
+    lines = build_line_facts(pipeline)
+
+    def score(style: PipelineStyle, row: ReferenceStyle) -> float:
+        return score_description(style, row, lines[style.style_key])
 
     matches: list[Match] = []
     used: set[tuple[str, str]] = set()
@@ -320,26 +340,24 @@ def match_rows(
             unmatched.append(row)
             continue
         # One code on two pipeline styles: the document printed it twice.
-        ranked = sorted(
-            coded.values(), key=lambda style: (-score_description(style, row), style.style_key)
-        )
+        ranked = sorted(coded.values(), key=lambda style: (-score(style, row), style.style_key))
         best = ranked[0]
         matches.append(Match(best, row, "code", 1.0))
         used.add((row.file, best.style_key))
 
     pairs = [
-        (score, row, style)
+        (fit, row, style)
         for row in unmatched
         for style in pipeline
         if style.model_year == row.model_year
-        and (score := score_description(style, row)) >= MIN_DESCRIPTION_SCORE
+        and (fit := score(style, row)) >= MIN_DESCRIPTION_SCORE
     ]
     pairs.sort(key=lambda pair: (-pair[0], _identify(pair[1]), pair[2].style_key))
     described: set[tuple[str, str, str]] = set()
-    for score, row, style in pairs:
+    for fit, row, style in pairs:
         if _identify(row) in described or (row.file, style.style_key) in used:
             continue
-        matches.append(Match(style, row, "description", round(score, 3)))
+        matches.append(Match(style, row, "description", round(fit, 3)))
         described.add(_identify(row))
         used.add((row.file, style.style_key))
 
@@ -349,8 +367,45 @@ def match_rows(
     return matches, missed, extra
 
 
-def score_description(style: PipelineStyle, row: ReferenceStyle) -> float:
-    """How well a reference row's trim and cab words fit a style: 0 where they contradict."""
+def build_line_facts(pipeline: list[PipelineStyle]) -> dict[str, LineFacts]:
+    """For each style, whether its line tells styles apart by powertrain and by cylinder count.
+
+    A line names a powertrain when any of its styles is marked as a hybrid;
+    where none is, an unmarked style is of unknown powertrain, not gas. A
+    cylinder count tells styles apart unless every style of the line states
+    the same one.
+    """
+    stated_lines = {
+        (style.model_year, resolution.squash(style.model))
+        for style in pipeline
+        if style.is_electrified
+    }
+    counts: dict[tuple[int, str, bool], set[int | None]] = defaultdict(set)
+    for style in pipeline:
+        key = (style.model_year, resolution.squash(style.model), style.is_electrified)
+        counts[key].add(_get_cylinders(style))
+    facts: dict[str, LineFacts] = {}
+    for style in pipeline:
+        line = (style.model_year, resolution.squash(style.model))
+        shared = counts[(*line, style.is_electrified)]
+        facts[style.style_key] = LineFacts(
+            is_powertrain_stated=line in stated_lines,
+            is_cylinder_count_telling=len(shared) > 1 or None in shared,
+        )
+    return facts
+
+
+def score_description(
+    style: PipelineStyle, row: ReferenceStyle, line: LineFacts | None = None
+) -> float:
+    """How well a reference row's trim and cab words fit a style: 0 where they contradict.
+
+    The score is the share of the trim's words and the style's grade and body
+    words that the two have in common. The row's cab, tier, body and seating
+    words count where the style has them and never against it, since a style
+    rarely names them.
+    """
+    line = line or LineFacts()
     if not _is_same_model(style, row):
         return 0.0
     row_drive = _REFERENCE_DRIVES.get(row.drivetrain_type or "") or resolution.get_drive_class(
@@ -362,28 +417,30 @@ def score_description(style: PipelineStyle, row: ReferenceStyle) -> float:
         is_manual = row.transmission_type == "manual"
         if is_manual != (style.transmission_class == resolution.MANUAL):
             return 0.0
-    if row.engine_type in ("gas", "diesel", "hybrid", "phev"):
+    if row.engine_type in ("gas", "diesel", "hybrid", "phev") and line.is_powertrain_stated:
         if (row.engine_type in ("hybrid", "phev")) != style.is_electrified:
             return 0.0
         if (row.engine_type == "phev") != style.is_plug_in:
             return 0.0
-    cylinders = resolution.get_cylinders(f"{style.engine or ''} {style.grade or ''}")
-    if row.cylinders and cylinders and row.cylinders != cylinders:
+    cylinders = _get_cylinders(style)
+    is_telling = line.is_cylinder_count_telling and row.cylinders and cylinders
+    if is_telling and row.cylinders != cylinders:
         return 0.0
 
     seats = row.labels.get("seating_capacity")
     labels = [row.labels.get(axis, "") for axis in ("cab", "tier", "body")]
-    row_text = " ".join([row.trim_name, *labels, f"{seats}passenger" if seats else ""])
-    model_words = set(resolution.list_words(f"{style.model} {row.model}"))
-    row_words = _list_name_words(row_text) - model_words
-    style_words = _list_name_words(f"{style.grade or ''} {style.body or ''}") - model_words
+    label_text = " ".join([*labels, f"{seats}passenger" if seats else ""])
+    model_words = set(resolution.list_words(f"{style.model} {row.model}")) | _FILLER_WORDS
+    trim_words = (_list_name_words(row.trim_name) - model_words) or _BASE_WORDS
+    label_words = _list_name_words(label_text) - model_words
+    grade_words = (_list_name_words(style.grade or "") - model_words) or _BASE_WORDS
+    style_words = grade_words | (_list_name_words(style.body or "") - model_words)
     # Two cabs share the word "cab" and are still different trucks.
     cab = _list_name_words(row.labels.get("cab", ""))
     if cab and style_words & _CAB_WORDS and not cab <= style_words:
         return 0.0
-    if not row_words and not style_words:
-        return 1.0
-    return len(row_words & style_words) / len(row_words | style_words)
+    shared = (trim_words | label_words) & style_words
+    return len(shared) / len(trim_words | style_words)
 
 
 def compare_cell(
@@ -578,6 +635,10 @@ def _list_name_words(text: str) -> set[str]:
     """
     words = resolution.list_words(resolution.expand_grade(text))
     return {word for word in words if word not in _BED_WORDS and not _BED_LENGTH.fullmatch(word)}
+
+
+def _get_cylinders(style: PipelineStyle) -> int | None:
+    return resolution.get_cylinders(f"{style.engine or ''} {style.grade or ''}")
 
 
 def _identify(row: ReferenceStyle) -> tuple[str, str, str]:
