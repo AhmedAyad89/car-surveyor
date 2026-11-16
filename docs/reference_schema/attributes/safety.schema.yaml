@@ -1,0 +1,578 @@
+# OpenSpec Safety Attributes
+# Active safety, driver assistance, and passive safety equipment.
+# Omit any attribute that is not equipped on this trim/config.
+#
+# Federally mandated equipment (seatbelts, TPMS, backup camera)
+# should only be listed at model level since it doesn't vary by trim.
+
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://openspec.visor.vin/schema/attributes/safety.json
+title: Safety Attributes
+type: object
+additionalProperties: false
+
+properties:
+
+  # ── Forward Safety ───────────────────────────
+  forward_collision_safety:
+    description: >
+      Forward collision safety system capability. Omit if not equipped.
+      Values form a progression — each level includes the capabilities
+      below it (AEB includes forward collision warning, pedestrian
+      detection includes basic AEB, etc.).
+    oneOf:
+      - const: warning
+        title: Forward Collision Warning
+        description: >
+          Alert only, no braking intervention. For vehicles with
+          FCW but not AEB.
+      - const: aeb
+        title: Automatic Emergency Braking
+        description: Forward AEB with vehicle detection only
+      - const: aeb_pedestrian
+        title: AEB with Pedestrian Detection
+        description: Forward AEB detecting vehicles and pedestrians
+      - const: aeb_pedestrian_cyclist
+        title: AEB with Pedestrian + Cyclist Detection
+        description: Forward AEB detecting vehicles, pedestrians, and cyclists
+
+  # ── Lane Safety ──────────────────────────────
+  lane_keep_assist:
+    description: >
+      Lane keeping system type. Omit if not equipped.
+      Encompasses the full spectrum from warning-only (lane departure
+      warning) through hands-free lane centering.
+    oneOf:
+      - const: warning
+        title: Lane Departure Warning
+        description: Alerts only, no steering input
+      - const: assist
+        title: Lane Keep Assist
+        description: Gentle steering corrections to stay in lane
+      - const: centering
+        title: Lane Centering
+        description: Active centering within lane (hands-on)
+      - const: centering_hands_free
+        title: Hands-Free Lane Centering
+        description: >
+          Hands-free highway lane centering with driver monitoring
+          (e.g. GM Super Cruise, Ford BlueCruise). OEM-certified
+          for hands-free operation on mapped roads.
+
+  # ── Cruise / Driving Assist ──────────────────
+  adaptive_cruise_control:
+    description: ACC type. Omit if only basic (non-adaptive) cruise equipped.
+    oneOf:
+      - const: adaptive
+        title: Adaptive Cruise Control
+        description: Radar/camera-based speed and distance following
+      - const: adaptive_stop_go
+        title: Adaptive Cruise with Stop & Go
+        description: Full-speed range including stop and resume
+
+  driving_assist_suite:
+    description: >
+      OEM-branded driver assistance suite. The key is generic; the value
+      is the canonical slug for the OEM marketing name. New suites and
+      versioned variants are added in minor schema versions.
+      Note: this field names the *suite* — individual capabilities
+      (AEB, lane centering, ACC, hands-free) are still captured in
+      their own attributes above.
+    oneOf:
+      # ── Toyota / Lexus ──
+      - const: toyota_safety_sense_2
+        title: Toyota Safety Sense 2.0
+        description: Toyota's ADAS suite, generation 2.0
+      - const: toyota_safety_sense_2_5
+        title: Toyota Safety Sense 2.5
+        description: Toyota's ADAS suite, generation 2.5
+      - const: toyota_safety_sense_3
+        title: Toyota Safety Sense 3.0
+        description: Toyota's ADAS suite, generation 3.0
+      - const: toyota_safety_sense_4
+        title: Toyota Safety Sense 4.0
+        since: "1.6"
+        description: Toyota's ADAS suite, generation 4.0
+      - const: lexus_safety_system_plus_2_5
+        title: Lexus Safety System+ 2.5
+        since: "1.8"
+        description: Lexus's ADAS suite, generation 2.5
+      - const: lexus_safety_system_plus_3
+        title: Lexus Safety System+ 3.0
+        description: Lexus's ADAS suite, generation 3.0
+      - const: lexus_safety_system_plus_4
+        title: Lexus Safety System+ 4.0
+        since: "1.8"
+        description: Lexus's ADAS suite, generation 4.0
+      # ── Honda / Acura ──
+      - const: honda_sensing
+        title: Honda Sensing
+        description: Honda's ADAS suite
+      - const: honda_sensing_360
+        title: Honda Sensing 360
+        description: Honda's omnidirectional ADAS suite with expanded radar coverage
+      - const: acurawatch
+        title: AcuraWatch
+        description: Acura's ADAS suite
+      - const: acurawatch_360
+        title: AcuraWatch 360
+        description: Acura's omnidirectional ADAS suite with expanded radar coverage
+      - const: acurawatch_360_plus
+        title: AcuraWatch 360+
+        description: Acura's premium ADAS suite with hands-free cruise and automatic parking
+      # ── Subaru ──
+      - const: subaru_eyesight
+        title: EyeSight
+        description: Subaru's stereo-camera ADAS suite
+      # ── Nissan / Infiniti ──
+      - const: nissan_safety_shield_360
+        title: Nissan Safety Shield 360
+        description: Nissan's standard ADAS bundle
+      - const: nissan_propilot_assist
+        title: ProPILOT Assist
+        description: Nissan/Infiniti highway driving assist
+      - const: nissan_propilot_assist_2
+        title: ProPILOT Assist 2.0
+        description: Nissan/Infiniti hands-free highway driving assist
+      # ── Mitsubishi ──
+      - const: mitsubishi_mi_pilot
+        title: MI-PILOT Assist
+        description: Mitsubishi's ADAS suite
+      # ── Mazda ──
+      - const: mazda_i_activsense
+        title: i-Activsense
+        description: Mazda's ADAS suite
+      # ── Hyundai / Kia / Genesis ──
+      - const: hyundai_smartsense
+        title: Hyundai SmartSense
+        description: Hyundai's ADAS suite
+      - const: kia_drive_wise
+        title: Kia Drive Wise
+        description: Kia's ADAS suite
+      - const: genesis_smartsense
+        title: Genesis Smart Sense
+        description: Genesis's ADAS suite
+      # ── Ford / Lincoln ──
+      - const: ford_co_pilot360
+        title: Ford Co-Pilot360
+        description: Ford's ADAS suite
+      - const: ford_bluecruise
+        title: BlueCruise
+        description: >
+          Ford's hands-free highway driving assist (built on top of
+          Co-Pilot360 on equipped trims)
+      - const: lincoln_co_pilot360
+        title: Lincoln Co-Pilot360
+        description: Lincoln's ADAS suite
+      # ── GM ──
+      - const: chevy_safety_assist
+        title: Chevy Safety Assist
+        description: Chevrolet's standard ADAS suite
+      - const: buick_driver_confidence
+        title: Buick Driver Confidence
+        description: Buick's standard ADAS suite
+      - const: gmc_pro_safety
+        title: GMC Pro Safety
+        description: GMC's standard ADAS suite
+      - const: gm_super_cruise
+        title: Super Cruise
+        description: GM's hands-free highway driving assist
+      # ── Stellantis ──
+      - const: stellantis_active_driving_assist
+        title: Active Driving Assist
+        description: Stellantis's lane-centering driving assist
+      # ── VW Group ──
+      - const: vw_iq_drive
+        title: IQ.DRIVE
+        description: Volkswagen's ADAS suite
+      - const: audi_pre_sense
+        title: Audi pre sense
+        description: Audi's ADAS suite
+      # ── BMW ──
+      - const: bmw_active_driving_assistant
+        title: Active Driving Assistant
+        description: BMW's standard ADAS suite
+      - const: bmw_driving_assistance_pro
+        title: Driving Assistance Professional
+        description: BMW's premium ADAS suite with extended hands-on assist
+      # ── Mercedes-Benz ──
+      - const: mercedes_driver_assistance
+        title: Mercedes-Benz Driver Assistance Package
+        description: Mercedes-Benz's ADAS suite
+      # ── Volvo / Polestar ──
+      - const: volvo_pilot_assist
+        title: Pilot Assist
+        description: Volvo/Polestar lane-centering driving assist
+      # ── Tesla ──
+      - const: tesla_autopilot
+        title: Autopilot
+        description: Tesla's standard driving assist
+      - const: tesla_enhanced_autopilot
+        title: Enhanced Autopilot
+        description: Tesla's mid-tier driving assist package
+      - const: tesla_full_self_driving
+        title: Full Self-Driving (Supervised)
+        description: Tesla's premium driver assist package
+      # ── Rivian / Lucid ──
+      - const: rivian_driver_plus
+        title: Driver+
+        description: Rivian's ADAS suite
+      - const: lucid_dreamdrive
+        title: DreamDrive
+        description: Lucid's ADAS suite
+      - const: lucid_dreamdrive_pro
+        title: DreamDrive Pro
+        description: Lucid's premium ADAS suite
+
+  traffic_jam_assist:
+    since: "1.6"
+    description: >
+      Low-speed congestion driving assist that combines stop-and-go
+      following with lane-centering or steering support. Omit when the
+      vehicle only has ordinary adaptive cruise with stop-and-go and no
+      separately published traffic-jam assist mode.
+    oneOf:
+      - const: hands_on
+        title: Hands-On Traffic Jam Assist
+        description: >
+          Driver-supervised congestion assist requiring hands on the
+          steering wheel.
+      - const: hands_free
+        title: Hands-Free Traffic Jam Assist
+        description: >
+          Driver-supervised congestion assist that permits hands-free
+          operation in supported low-speed conditions.
+
+  assisted_lane_change:
+    since: "1.6"
+    description: >
+      Active lane-change assistance while a driving-assist system is
+      engaged. Omit alert-only blind-spot/lane-change warnings; those
+      belong under blind_spot_monitoring.
+    oneOf:
+      - const: signal_initiated
+        title: Signal-Initiated Lane Change Assist
+        description: >
+          Driver requests the lane change, typically with the turn
+          signal, and the vehicle assists steering into the adjacent lane.
+      - const: hands_free
+        title: Hands-Free Lane Change Assist
+        description: >
+          Hands-free driving-assist system can execute or assist lane
+          changes on supported roads with driver supervision.
+
+  driver_monitoring:
+    since: "1.6"
+    description: >
+      Driver attention or engagement monitoring beyond ordinary seatbelt
+      and steering-wheel warnings. Omit when the OEM does not publish a
+      driver-monitoring feature.
+    oneOf:
+      - const: attention_warning
+        title: Driver Attention Warning
+        description: >
+          Infers distraction or drowsiness from vehicle behavior or
+          control inputs and alerts the driver.
+      - const: camera
+        title: Camera-Based Driver Monitoring
+        description: >
+          Uses an in-cabin camera or driver-facing sensor to monitor
+          attention, gaze, head position, or engagement.
+
+  traffic_sign_recognition:
+    since: "1.5"
+    description: >
+      Traffic or road sign recognition capability. Omit if not equipped.
+      Values distinguish display-only systems from systems that actively
+      warn the driver or support speed-limit assistance. This does not
+      replace driving_assist_suite; it captures the decomposed capability
+      when published by the OEM.
+    oneOf:
+      - const: display
+        title: Traffic Sign Display
+        description: >
+          Recognizes road signs such as speed limit or stop signs and
+          displays them in the instrument cluster, HUD, or infotainment
+          display.
+      - const: warning
+        title: Traffic Sign Warning
+        description: >
+          Recognizes traffic or road signs and can alert the driver
+          when a relevant sign or traffic-signal condition is detected.
+      - const: speed_assist
+        title: Speed Limit Assist
+        description: >
+          Recognizes speed-limit information and can use it to inform
+          or adjust driver-assistance speed settings when supported.
+
+  # ── Surround Awareness ──────────────────────
+  blind_spot_monitoring:
+    description: >
+      Blind spot monitoring system type. Omit if not equipped.
+    oneOf:
+      - const: alert
+        title: Blind Spot Alert
+        description: Visual and/or audible warning only
+      - const: intervention
+        title: Blind Spot Intervention
+        description: >
+          Alert plus active steering correction to prevent lane
+          change into occupied adjacent lane (e.g. Nissan Blind Spot
+          Intervention, Honda BSI)
+
+  rear_cross_traffic:
+    description: >
+      Rear cross-traffic safety system. Omit if not equipped.
+      Values form a progression — braking includes the alert
+      capability.
+    oneOf:
+      - const: alert
+        title: Rear Cross-Traffic Alert
+        description: Alerts when cross traffic detected while reversing
+      - const: braking
+        title: Rear Cross-Traffic with Automatic Braking
+        description: >
+          Alerts for cross traffic plus automatic braking when
+          reversing toward obstacles (e.g. Toyota Rear Cross-Traffic
+          Braking, Subaru Reverse Automatic Braking)
+
+  reverse_collision_safety:
+    since: "1.8"
+    description: >
+      Reverse-path collision warning or automatic braking for objects,
+      vehicles, pedestrians, or other obstacles behind the vehicle while
+      backing up. Omit if the vehicle only has rear cross-traffic alert.
+      Values form a progression — braking includes warning capability.
+    oneOf:
+      - const: warning
+        title: Reverse Collision Warning
+        description: >
+          Alerts when a reverse-path obstacle or collision risk is detected.
+      - const: braking
+        title: Reverse Automatic Braking
+        description: >
+          Alerts plus automatic braking or braking support when backing
+          toward a detected obstacle.
+
+  front_cross_traffic:
+    since: "1.6"
+    description: >
+      Front cross-traffic safety system for detecting crossing vehicles,
+      cyclists, or pedestrians ahead of the vehicle at intersections,
+      blind exits, or low-speed maneuvers. Values form a progression —
+      braking includes the alert capability.
+    oneOf:
+      - const: alert
+        title: Front Cross-Traffic Alert
+        description: Alerts when cross traffic is detected ahead.
+      - const: braking
+        title: Front Cross-Traffic with Automatic Braking
+        description: >
+          Alerts for front cross traffic plus automatic braking or
+          collision mitigation when the vehicle is moving forward.
+
+  safe_exit:
+    since: "1.6"
+    description: >
+      Door-opening safety system that warns occupants about approaching
+      vehicles or cyclists before they exit. Omit if not equipped.
+    oneOf:
+      - const: alert
+        title: Safe Exit Alert
+        description: Warns occupants when opening a door may conflict with approaching traffic.
+      - const: intervention
+        title: Safe Exit Assist
+        description: >
+          Warns occupants and can inhibit door opening or hold an
+          electronic child lock when approaching traffic is detected.
+
+  rear_occupant_alert:
+    since: "1.17"
+    description: >
+      Rear-seat occupant reminder or detection system. Omit if not equipped.
+      Encode the mechanism established by the OEM rather than mapping a
+      generic marketing name without supporting documentation.
+    oneOf:
+      - const: door_logic
+        title: Rear Occupant Reminder
+        description: >
+          Uses rear-door opening or trip logic to remind the driver to check
+          the rear seats; it does not directly sense an occupant.
+      - const: occupant_detection
+        title: Rear Occupant Detection
+        description: >
+          Uses radar, ultrasonic, weight, or another in-cabin sensor to
+          detect a rear-seat occupant and alert after the vehicle is parked.
+
+  surround_view_camera:
+    description: >
+      360-degree surround view camera system. Omit if not equipped.
+    oneOf:
+      - const: basic
+        title: Surround View Camera
+        description: Top-down bird's-eye 360-degree view
+      - const: 3d
+        title: 3D Surround View Camera
+        description: >
+          360-degree camera with 3D visualization and multiple
+          selectable viewpoints
+
+  camera_recording:
+    since: "1.6"
+    type: array
+    uniqueItems: true
+    description: >
+      Factory-integrated camera recording features using vehicle cameras
+      or OEM-installed dashcam hardware. Omit accessory dashcams that do
+      not integrate with the vehicle camera system.
+    items:
+      type: string
+      oneOf:
+        - const: drive_recorder
+          title: Drive Recorder
+          description: >
+            Driver-initiated or continuous road video recording using
+            vehicle cameras or factory-integrated dashcam hardware.
+        - const: incident_recorder
+          title: Incident Recorder
+          description: >
+            Automatically saves video around a collision, theft alarm, or
+            other detected incident.
+        - const: parking_surveillance
+          title: Parking Surveillance Recording
+          description: >
+            Monitors or records around the parked vehicle using exterior
+            cameras or factory-integrated recording hardware.
+
+  parking_sensors:
+    type: array
+    description: Parking sensor locations. Omit if not equipped.
+    items:
+      type: string
+      oneOf:
+        - const: front
+          title: Front
+        - const: rear
+          title: Rear
+        - const: side
+          title: Side
+          since: "1.17"
+
+  parking_assist:
+    description: >
+      Automated parking assistance capability. Omit if not equipped.
+    oneOf:
+      - const: steering_assist
+        title: Steering Assist
+        description: >
+          System steers into parallel or perpendicular spaces while the
+          driver controls braking, throttle, and shifting
+      - const: automated
+        title: Automated Parking Assist
+        description: >
+          System controls steering plus vehicle motion during parking
+          maneuvers, typically with driver supervision
+      - const: remote
+        title: Remote Parking Assist
+        description: >
+          Driver can command or supervise parking from outside the
+          vehicle via key fob or app; implies automated parking assist
+
+  # ── Passive Safety ───────────────────────────
+  airbags:
+    type: array
+    description: >
+      Airbag positions equipped beyond the federally mandated
+      front driver/passenger. Only list positions that vary by trim.
+    items:
+      type: string
+      enum: [front_side, rear_side, front_knee,
+             curtain, curtain_third_row, center]
+
+  # ── Towing Driver Assistance ─────────────────
+  trailer_brake_controller:
+    description: >
+      Factory trailer brake controller. Omit if not equipped.
+      Kept standalone because it has meaningful variants —
+      integrated vs pre-wired. Pure presence/absence trailer
+      aids go in trailer_assistance.
+    applicability:
+      body_style: [truck, suv, crossover, van, minivan, cab_chassis]
+    oneOf:
+      - const: integrated
+        title: Integrated
+        description: Dash-mounted controller factory-installed
+      - const: preparation
+        title: Pre-Wired for Aftermarket
+        description: >
+          Factory wiring and mount point; controller sold separately
+          or installed at dealer.
+
+  trailer_assistance:
+    type: array
+    uniqueItems: true
+    description: >
+      Factory trailering driver aids. Omit if none equipped.
+      For the trailer brake controller (which has meaningful
+      variants), see trailer_brake_controller.
+    applicability:
+      body_style: [truck, suv, crossover, van, minivan, cab_chassis]
+    items:
+      type: string
+      oneOf:
+        - const: sway_control
+          title: Trailer Sway Control
+          description: >
+            Electronic system that selectively applies brakes and
+            reduces power to stabilize a swaying trailer.
+        - const: backup_assist
+          title: Trailer Backup Assist
+          description: >
+            Steering assistance while backing a trailer, typically
+            via a dedicated knob or touchscreen input (e.g. Ford Pro
+            Trailer Backup Assist, Ram Trailer Reverse Steering Control).
+        - const: hitch_guidance
+          title: Hitch Guidance
+          description: >
+            Camera-based trajectory overlay that aligns the hitch
+            ball with a coupler (e.g. Ford Pro Trailer Hitch Assist,
+            GM Hitch Guidance, Toyota Straight Path Assist).
+        - const: trailer_camera_view
+          title: Trailer Camera View
+          description: >
+            Dedicated trailer-mounted or pass-through camera feed
+            for trailer-aware reversing and blind-spot coverage
+            (e.g. Ford Pro Trailer Hitch Assist with trailer camera,
+            GM Transparent Trailer / Trailer Blindzone, Ram Trailer
+            Camera).
+
+  # ── Off-Road Driver Assistance ──────────────
+  off_road_assistance:
+    type: array
+    uniqueItems: true
+    description: >
+      Factory off-road driver-assistance features. Omit if none
+      equipped.
+    applicability:
+      body_style: [truck, suv, crossover, cab_chassis]
+    items:
+      type: string
+      oneOf:
+        - const: crawl_control
+          title: Crawl Control
+          description: >
+            Low-speed off-road cruise control that modulates throttle
+            and brakes on uneven terrain. Examples: Toyota Crawl
+            Control, Land Rover All-Terrain Progress Control.
+        - const: hill_descent_control
+          title: Hill Descent Control
+          description: >
+            Automatic throttle and brake modulation to maintain a set
+            low speed on steep descents.
+        - const: terrain_camera_view
+          title: Terrain Camera View
+          since: "1.6"
+          description: >
+            Selectable off-road camera views for nearby terrain,
+            obstacles, or wheel placement, such as Toyota Multi-Terrain
+            Monitor, Jeep TrailCam, or Land Rover ClearSight Ground View.

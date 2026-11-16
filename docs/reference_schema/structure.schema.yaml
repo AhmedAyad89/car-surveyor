@@ -1,0 +1,1615 @@
+# OpenSpec Data File Schema
+# JSON Schema Draft 2020-12, written in YAML.
+# Validates the structure of YMM data files.
+#
+# Usage:
+#   check-jsonschema --schemafile schema/structure.schema.yaml data/us/toyota/corolla-cross/2026.yaml
+#
+# This schema handles structure, types, enums, and ranges.
+# Cross-reference checks (option reachability, includes resolution,
+# modifies path validation) require a separate lightweight script.
+#
+# Custom Annotation Keywords (used in attribute schemas):
+#
+#   since: "1.3"
+#     Schema version that introduced this attribute. Used to distinguish
+#     "not equipped" from "predates this attribute" when a file omits a value.
+#     If a file's schema_version < the attribute's since, omission = unknown.
+#     If a file's schema_version >= since and section is complete, omission = not equipped.
+#     CONVENTION: Omit "since" for attributes introduced in schema version 1.0.
+#     Absence of "since" means the attribute has existed since schema inception.
+#     Only add "since" when an attribute is introduced in a later minor version.
+#
+#   applicability:
+#     body_style: [truck]             — attribute only applies to these body styles
+#     engine.type: [bev, phev]        — attribute only applies to these engine types
+#     powertrain.drivetrain.type: [4wd] — attribute only applies to these drivetrains
+#     Attributes without an applicability block apply universally.
+#     CI validation uses these to determine whether a missing attribute is
+#     an error (applicable + section complete) or expected (not applicable).
+#
+# Anchor Attributes:
+#   body_style and powertrain.engine.type are "anchor" attributes —
+#   they must be present even in stub files because the applicability system
+#   depends on them to resolve which other attributes are expected.
+#
+#   body_style follows the standard inheritance chain:
+#   model → trim parent chain → trim → configuration.
+#   Set it at model level when all configurations share one body style (the common case).
+#   Set it at trim or configuration level when body style varies (e.g. BMW 3 Series
+#   offered as sedan and wagon). CI validates that every configuration resolves to
+#   a body_style value through inheritance.
+#
+#   exterior.cab.style is a body_style: truck/cab_chassis-scoped anchor introduced
+#   in schema 1.2. When body_style resolves to truck or cab_chassis, every
+#   configuration must also resolve a cab.style through the same inheritance
+#   chain. Set exterior.cab at the trim level for trims with a fixed cab; set
+#   it on each configuration when cab is a configuration axis. The companion
+#   exterior.cab.name preserves the OEM marketing label (e.g. "CrewMax")
+#   for trims where cab does not vary and therefore has no axis label.
+
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://openspec.visor.vin/schema/structure.json
+title: OpenSpec YMM Data File
+type: object
+required: [_meta, model, trims]
+additionalProperties: false
+
+properties:
+
+  # ============================================================
+  # META
+  # ============================================================
+  _meta:
+    $ref: "#/$defs/meta"
+
+  # ============================================================
+  # MODEL
+  # ============================================================
+  model:
+    type: object
+    required: [make, model, year]
+    additionalProperties: false
+    dependentRequired:
+      production_limit: [edition]
+    properties:
+      make:       { type: string }
+      model:      { type: string }
+      year:
+        description: Model year. Whole years use integers; mid-cycle revisions use `.5`.
+        oneOf:
+          - type: integer
+            minimum: 2000
+          - type: number
+            minimum: 2000
+            multipleOf: 0.5
+            not:
+              type: integer
+
+      generation:
+        type: string
+        description: >
+          Optional generation identifier within the model lineage.
+          Examples: "XN50", "A90", "5th Gen".
+
+      model_family:
+        $ref: "#/$defs/named_entity"
+        since: "1.7"
+        description: >
+          Optional OEM/market-facing family or range that groups related model
+          lineages, such as BMW 4 Series, Ford Mustang, Porsche Cayenne, or
+          Land Rover Defender. The directory slug remains the canonical model
+          lineage identifier; model_family is a grouping label, not a path
+          override.
+
+      body_variant:
+        $ref: "#/$defs/named_entity"
+        since: "1.7"
+        description: >
+          Optional structural/product body form when body_style is too coarse,
+          such as Gran Coupe, 4-Door Coupe, Targa, Cabriolet, Sportback,
+          Coupe, Defender 110, Cargo Van, Passenger Van, Cutaway, or Chassis
+          Cab. This preserves OEM/product identity and is not a closed subtype
+          enum. Inherits like body_style through model -> trim ->
+          configuration.
+
+      destination_charge:
+        type: integer
+        minimum: 0
+        description: >
+          Manufacturer destination/freight charge in the file's market
+          currency,
+          excluding taxes, title, registration, dealer fees, and
+          incentives. This is separate from configuration MSRP, which
+          records base MSRP before destination. Set at model level when
+          shared across configurations; use a configuration override only
+          when an OEM publishes configuration-specific destination charges.
+
+      edition:
+        $ref: "#/$defs/edition_kind"
+
+      production_limit:
+        $ref: "#/$defs/production_limit"
+
+      body_style:
+        $ref: "#/$defs/body_style"
+
+      # Model-level attributes — shared across all trims.
+      # Use for specs that never vary by trim/config.
+      powertrain:
+        $ref: "attributes/powertrain.schema.yaml"
+      dimensions:
+        $ref: "attributes/dimensions.schema.yaml"
+      chassis:
+        $ref: "attributes/chassis.schema.yaml"
+      safety:
+        $ref: "attributes/safety.schema.yaml"
+      exterior:
+        $ref: "attributes/exterior.schema.yaml"
+      interior:
+        $ref: "attributes/interior.schema.yaml"
+      infotainment:
+        $ref: "attributes/infotainment.schema.yaml"
+      fuel_economy:
+        $ref: "attributes/fuel_economy.schema.yaml"
+      warranty:
+        $ref: "attributes/warranty.schema.yaml"
+
+  # ============================================================
+  # TRIMS
+  # ============================================================
+  trims:
+    type: object
+    description: >
+      Keys are trim slugs — terse lowercase_snake_case identifiers, not
+      descriptions. Target 40 characters or fewer. Use the trim field for
+      the full OEM display name. Keep slugs consistent across model years
+      for the same trim level.
+    additionalProperties:
+      $ref: "#/$defs/trim"
+
+  # ============================================================
+  # OPTIONS
+  # ============================================================
+  options:
+    type: object
+    description: >
+      Keys are option slugs — terse lowercase_snake_case identifiers, not
+      descriptions. Target 40 characters or fewer. Use the name field for
+      the full OEM display name. Keep slugs consistent across model years
+      for the same option.
+    additionalProperties:
+      $ref: "#/$defs/option"
+
+  vin_decode:
+    $ref: "#/$defs/vin_decode"
+
+
+# ============================================================
+# DEFINITIONS
+# ============================================================
+
+$defs:
+
+  # ----------------------------------------------------------
+  # Meta
+  # ----------------------------------------------------------
+  meta:
+    type: object
+    required: [schema_version, status]
+    additionalProperties: false
+    properties:
+      schema_version:
+        type: string
+        pattern: "^\\d+\\.\\d+\\.\\d+$"
+        description: >
+          OpenSpec schema version this file conforms to.
+          Minor versions add optional fields only.
+          Major versions may require migration.
+
+      market:
+        $ref: "#/$defs/market"
+
+      status:
+        type: string
+        enum: [stub, draft, populated]
+        description: >
+          Agent-owned pipeline maturity for the data population workflow.
+          stub = lineup-task skeleton (identity, anchors, VIN patterns,
+          minimal attributes).
+          draft = population in progress; sources partially layered.
+          populated = population run completed against its source dossier.
+          Human endorsement does NOT live here — release readiness is the
+          `approved` cell in the make's lineup.yaml registry, an
+          internal-only file excluded from the public mirror (see
+          docs/lifecycle-and-approval.md). Schema 1.9 renamed `open` to
+          `populated` and removed `locked`.
+
+      completeness:
+        type: object
+        description: >
+          Per-section completeness level. Only sections with authored data
+          appear here — absence of a key means the section has no data.
+          The autofix tool maintains this block automatically; do not edit
+          it by hand unless promoting a section to "full".
+
+          Values: "partial" (some data, known gaps) and "full" (believed
+          complete for available sources). When a section is "full",
+          omission of an applicable attribute means the vehicle genuinely
+          lacks that feature. When "partial", omission may mean not yet
+          documented. Schema 1.9 removed the "verified" level — human
+          review is recorded as lineup.yaml approval, not per-section.
+
+          The vin_decode key tracks VIN pattern coverage. When "full", all
+          VDS patterns from the manufacturer's 49 CFR 565 submission are
+          represented and mapped to trims. When "partial", patterns may be
+          missing or unmapped.
+
+          The options system uses two separate completeness keys:
+            options — the option list itself (names, categories, availability,
+              color metadata, MSRPs). When "full", absence of an option
+              means it is confirmed not available on this model.
+            option_rules — build rules and inter-option relationships
+              (modifies, includes, requires, incompatible_with,
+              compatible_with), including per-trim overrides in extended
+              availability entries. When "full", absence of an effective
+              modifies block means the option does not change any
+              structured attributes; absence of compatible_with on an
+              interior color means it is compatible with all exterior
+              colors.
+        propertyNames:
+          enum:
+            - model
+            - trims
+            - powertrain
+            - fuel_economy
+            - chassis
+            - dimensions
+            - exterior
+            - interior
+            - infotainment
+            - safety
+            - warranty
+            - options
+            - option_rules
+            - vin_decode
+        additionalProperties:
+          type: string
+          enum: [partial, full]
+
+      slug_aliases:
+        type: array
+        since: "1.9"
+        description: >
+          Append-only record of trim/configuration/option slugs that have
+          left this file. Trim and configuration slugs in released files are
+          the public spec-ref stability contract — `openspec slugs guard`
+          rejects their disappearance without a covering entry here. Renames
+          and merges carry `to` (the surviving slug); genuine removals
+          declare `removed: true`. Configuration entries add `trim` (the
+          trim the configuration now lives under) because config slugs are
+          scoped to their trim. An entry for a slug that moved here from
+          another model's file names that model in `model`.
+        items:
+          type: object
+          required: [type, from]
+          additionalProperties: false
+          oneOf:
+            - required: [to]
+            - required: [removed]
+          properties:
+            type:
+              type: string
+              enum: [trim, configuration, option]
+            trim:
+              type: string
+              description: Owning trim slug — required for configuration aliases.
+            model:
+              type: string
+              description: >
+                Model slug the `from` slug was released under, when it moved
+                into this file from another model (a fold or split). Omit for
+                slugs that left this file's own model.
+            from: { type: string }
+            to: { type: string }
+            removed: { const: true }
+            at: { type: string, format: date }
+            notes: { type: string }
+
+      sources:
+        type: array
+        items:
+          type: object
+          required: [type]
+          properties:
+            type:
+              type: string
+              enum: [oem_brochure, oem_configurator, oem_order_guide,
+                     oem_press_release, nhtsa_vin_decode,
+                     press_release, third_party, other]
+              description: >
+                oem_press_release is a product announcement published by the
+                manufacturer's own newsroom -- a pricing-and-packaging release
+                is as primary as a brochure. press_release stays for
+                third-party coverage and reprints, which are not primary.
+            url:         { type: string, format: uri }
+            archive_url: { type: string, format: uri }
+            published:   { type: string, format: date }
+            description: { type: string }
+            notes:       { type: string }
+          additionalProperties: false
+
+      last_updated: { type: string, format: date }
+
+  # ----------------------------------------------------------
+  # Trim
+  # ----------------------------------------------------------
+  trim:
+    type: object
+    required: [trim, configurations]
+    additionalProperties: false
+    dependentRequired:
+      production_limit: [edition]
+    properties:
+      trim:
+        type: string
+        description: OEM trim name for display
+
+      edition:
+        $ref: "#/$defs/edition_kind"
+
+      production_limit:
+        $ref: "#/$defs/production_limit"
+
+      extends:
+        type: string
+        description: >
+          Optional same-file parent trim slug for OEM trim ladders where this
+          trim inherits the parent trim's standard equipment and then adds or
+          replaces features. Inherits only trim-level body_variant, body_style,
+          and attribute categories — never configurations, configuration_axes,
+          pricing, options, or VIN decode data. CI rejects unknown parents,
+          self references, and cycles. Use only when the source presents a
+          clear trim-equipment chain.
+
+      body_variant:
+        $ref: "#/$defs/named_entity"
+        since: "1.7"
+        description: >
+          Optional structural/product body form when body_style is too coarse.
+          Inherits like body_style through model -> trim -> configuration.
+
+      body_style:
+        $ref: "#/$defs/body_style"
+
+      configuration_axes:
+        type: array
+        description: >
+          Axes of variation within this trim (e.g. drivetrain, cab, bed).
+          Omit when the trim has a single configuration with no variants.
+        items:
+          $ref: "#/$defs/axis_name"
+
+      configurations:
+        type: object
+        minProperties: 1
+        additionalProperties:
+          $ref: "#/$defs/configuration"
+        propertyNames:
+          pattern: "^[a-z0-9]+(?:_[a-z0-9]+)*$"
+          description: >
+            Configuration slug — lowercase snake_case identifier.
+            Immutable once committed; use discontinued field instead
+            of removing.
+
+      # Attribute categories — trim-level defaults
+      powertrain:
+        $ref: "attributes/powertrain.schema.yaml"
+      dimensions:
+        $ref: "attributes/dimensions.schema.yaml"
+      chassis:
+        $ref: "attributes/chassis.schema.yaml"
+      safety:
+        $ref: "attributes/safety.schema.yaml"
+      exterior:
+        $ref: "attributes/exterior.schema.yaml"
+      interior:
+        $ref: "attributes/interior.schema.yaml"
+      infotainment:
+        $ref: "attributes/infotainment.schema.yaml"
+      fuel_economy:
+        $ref: "attributes/fuel_economy.schema.yaml"
+      warranty:
+        $ref: "attributes/warranty.schema.yaml"
+
+  # ----------------------------------------------------------
+  # Configuration
+  # ----------------------------------------------------------
+  configuration:
+    type: object
+    additionalProperties: false
+    dependentRequired:
+      production_limit: [edition]
+      alternate_codes: [code]
+    properties:
+      discontinued:
+        type: string
+        format: date
+        since: "1.1"
+        description: >
+          Date this configuration was discontinued (YYYY-MM-DD).
+          Used to tombstone configurations that are no longer orderable
+          while preserving the slug and data for historical reference.
+          Stored references never dangle — downstream consumers check
+          this field to know if the config is still current.
+      code:
+        type: string
+        description: >
+          OEM sales/model code for this configuration — the identifier the
+          manufacturer uses in order guides, configurators, and vehicle
+          build records to refer to this exact SKU (e.g. Toyota "6953",
+          Ford "W1E", Honda "SE2F5REW"). This is a sourced fact, not a
+          derived slug. Do not synthesize codes from the
+          trim name, axis values, or any other pattern; if the OEM code
+          is not known, omit the field. Derived or placeholder codes
+          corrupt VIN-decode validation and downstream dealer-system
+          integration.
+      alternate_codes:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items:
+          type: string
+          minLength: 1
+        description: >
+          Other OEM sales/model codes the manufacturer prints for this same
+          configuration, beside `code` (Nissan prints two code families for
+          one build: a 2026 Sentra SR is 12216 or 12416, same sticker
+          header and base price). A consumer matching a code treats each
+          alternate as `code`. Sourced facts only, never derived; a code
+          that names another configuration does not belong here.
+      msrp:
+        type: integer
+        exclusiveMinimum: 0
+        description: >
+          Manufacturer's base suggested retail price in the file's market
+          currency
+          before destination/freight, taxes, title, registration, dealer
+          fees, and incentives (e.g. 31650, not cents).
+
+      destination_charge:
+        type: integer
+        minimum: 0
+        description: >
+          Configuration-specific destination/freight charge in the file's
+          market currency. Omit when the charge is shared at model level.
+
+      edition:
+        $ref: "#/$defs/edition_kind"
+
+      production_limit:
+        $ref: "#/$defs/production_limit"
+
+      body_variant:
+        $ref: "#/$defs/named_entity"
+        since: "1.7"
+        description: >
+          Optional structural/product body form when body_style is too coarse.
+          Overrides any trim- or model-level body_variant for this
+          configuration.
+
+      body_style:
+        $ref: "#/$defs/body_style"
+
+      # Axis values — display labels for configuration variants.
+      # These are human-facing labels used for UI rendering (e.g.,
+      # configurator dropdowns). The machine-readable spec lives in
+      # the attribute overrides below.
+      drivetrain:
+        type: string
+        description: >
+          Display label for the drivetrain variant. Use the OEM's
+          human-facing variant label when it differs from the generic
+          category; the machine-readable drivetrain classification
+          lives in `powertrain.drivetrain.type`.
+          Recommended values: FWD, AWD, 4WD, RWD.
+      battery:
+        type: string
+        description: >
+          Display label for the battery-pack variant. Use the OEM's
+          marketed pack/range label; the machine-readable usable capacity
+          lives in `powertrain.electric.battery_capacity_kwh`.
+          Examples: Standard Range, Extended Range, Long Range, Large Pack.
+      transmission:
+        type: string
+        description: >
+          Display label for the transmission variant. Use the OEM's
+          human-facing variant label when it differs from the generic
+          category; the machine-readable transmission classification
+          lives in `powertrain.transmission.type`.
+          Recommended values: Automatic, Manual, CVT, DCT.
+      seating_capacity:
+        type: integer
+        minimum: 2
+        description: >
+          Seating capacity variant.
+          Common values: 2, 4, 5, 6, 7, 8.
+      body:
+        type: string
+        description: >
+          Display label for the body variant.
+          Recommended values: Sedan, Coupe, Hatchback, Wagon, Touring.
+      steering_position:
+        type: string
+        description: >
+          Display label for the steering position variant.
+          Recommended values: LHD, RHD.
+      cab:
+        type: string
+        description: >
+          Display label for the cab variant. Use OEM names.
+          Recommended values: Regular Cab, Quad Cab, Crew Cab,
+          SuperCrew, King Cab, Double Cab, Mega Cab, Access Cab.
+      bed:
+        type: string
+        description: >
+          Display label for the bed length variant. Use common
+          notation with apostrophe-quote for feet and inches.
+          Recommended values: 5'7", 6'4", 8'.
+      wheelbase:
+        type: string
+        description: >
+          Display label for the wheelbase variant. Use OEM inch labels;
+          the machine-readable measurement lives in `dimensions.wheelbase_in`.
+          Recommended values: 145", 169", 193", 205".
+      rear_wheels:
+        type: string
+        description: >
+          Display label for the rear wheel configuration variant.
+          Used on heavy-duty pickups and cab-chassis trucks that
+          offer both single and dual rear wheel ("dually") setups.
+          Recommended values: SRW, DRW.
+      engine:
+        type: string
+        description: >
+          Display label for the engine/powertrain variant.
+          Use displacement and configuration.
+          Examples: 3.6L V6, 5.7L HEMI V8, 2.5L Hybrid.
+      tier:
+        type: string
+        description: >
+          Display label for the sub-trim or equipment tier.
+          Examples: Standard, Premium, Launch Edition.
+
+      # Config-level attribute overrides
+      powertrain:
+        $ref: "attributes/powertrain.schema.yaml"
+      dimensions:
+        $ref: "attributes/dimensions.schema.yaml"
+      chassis:
+        $ref: "attributes/chassis.schema.yaml"
+      safety:
+        $ref: "attributes/safety.schema.yaml"
+      exterior:
+        $ref: "attributes/exterior.schema.yaml"
+      interior:
+        $ref: "attributes/interior.schema.yaml"
+      infotainment:
+        $ref: "attributes/infotainment.schema.yaml"
+      fuel_economy:
+        $ref: "attributes/fuel_economy.schema.yaml"
+      warranty:
+        $ref: "attributes/warranty.schema.yaml"
+
+  # ----------------------------------------------------------
+  # Option
+  # ----------------------------------------------------------
+  option:
+    type: object
+    required: [name, category, availability]
+    additionalProperties: false
+    dependentRequired:
+      production_limit: [edition]
+    allOf:
+      - not:
+          required: [category, selection_group]
+          properties:
+            category:
+              const: exterior_color
+      - if:
+          required: [palette_role]
+        then:
+          required: [selection_group, base_color]
+          properties:
+            category:
+              const: interior_color
+          not:
+            required: [palette]
+      - if:
+          required: [category, selection_group]
+          properties:
+            category:
+              const: interior_color
+        then:
+          required: [palette_role]
+      - if:
+          required: [special_order_palette]
+        then:
+          required: [paint_program]
+          properties:
+            category:
+              const: exterior_color
+          not:
+            anyOf:
+              - required: [base_color]
+              - required: [hex]
+              - required: [paint_finish]
+    properties:
+      name:
+        type: string
+        description: OEM display name for this option
+
+      category:
+        type: string
+        description: >
+          Commercial category of the option. `emissions_certification`
+          (since 1.20) is the federal-versus-California (CARB) certification
+          of an otherwise identical build: SULEV, PZEV, ULEV, "California
+          Emissions", "50-State Emissions". It is never a configuration axis,
+          a trim, or an engine axis label, because the build is not a buyer
+          choice and most VINs cannot distinguish it. Author the source's own
+          label as `name`, the OEM code for the certified build as `code` or
+          as a per-trim availability `code` (Hyundai `48412F4P`), a published
+          upcharge as `msrp`, a published spec delta as `modifies`, status `S`
+          where a trim carries exactly one certification, and attach it per
+          VIN through `vin_decode.patterns[].options` when the VDS encodes it.
+          `subscription` (since 1.22) is a time-limited service term sold or
+          bundled with the vehicle: connected-services and telematics trials
+          (Toyota Safety Connect, Remote Connect, Wi-Fi Connect), satellite
+          radio trials and extensions, and navigation data plans. It stays in
+          the catalog so OEM codes and prices match, but it is not equipment:
+          shopper-facing option lists and filters exclude it. Hardware that
+          enables a service (a satellite radio receiver, a navigation package)
+          keeps its equipment category.
+          `software` (since 1.32) is a feature unlocked in software on the
+          vehicle's existing hardware, bought outright or bundled with the
+          build: Tesla Full Self-Driving and Enhanced Autopilot. The OEM can
+          remove it, end it or move it to another vehicle, so a window
+          sticker, an as-originally-sold list or an OEM record shows it only
+          at that record's date; only the listing's own statement says the
+          vehicle has it now. It is a shopper-facing option. The hardware
+          that runs it keeps its equipment category, and time-limited plans
+          are `subscription`.
+        enum:
+          - package
+          - configuration_choice
+          - exterior_color
+          - interior_color
+          - interior_finish
+          - exterior_accessory
+          - interior_accessory
+          - audio
+          - safety
+          - wheel
+          - tire
+          - emissions_certification
+          - subscription
+          - software
+          - charge
+
+      selection_group:
+        since: "1.13"
+        type: string
+        pattern: "^[a-z0-9]+(?:_[a-z0-9]+)*$"
+        maxLength: 40
+        description: >
+          File-local identity of an OEM radio picker. Options with the same
+          selection_group are mutually exclusive even when their broad
+          commercial categories differ. Omit when the category's default
+          single-selection behavior already represents the picker. Forbidden
+          on exterior_color: a build always has exactly one body color; model
+          separate roof/body treatments through their established attributes.
+
+      requires_selection_groups:
+        since: "1.15"
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items:
+          type: string
+          pattern: "^[a-z0-9]+(?:_[a-z0-9]+)*$"
+          maxLength: 40
+        description: >
+          Named follow-up pickers that become mandatory when this option is
+          equipped. Each value references an explicit selection_group in this
+          file; a complete order must equip exactly one available member of
+          every referenced group. Use this for OEM flows such as choosing a
+          contrast-stitching color after selecting contrast stitching, not for
+          ordinary option-to-option dependencies (use requires for those).
+
+      availability:
+        type: object
+        description: >
+          Keys are trim slugs. Values are availability status.
+          Every trim defined in the file MUST have an entry —
+          use null (~) for trims where the option is not available, and
+          U (unknown) where the sources do not establish availability.
+          CI validates that availability keys match trim keys.
+
+          For exterior_color and interior_color options, status is O, U,
+          or null — never S. A color is never "standard" in the option-system
+          sense: a complete order chooses one exterior color and either one
+          atomic interior colorway or one option for every offered interior
+          palette role. Autofix normalizes any S on a color option to O.
+        additionalProperties:
+          $ref: "#/$defs/availability_value"
+
+      configuration_binding:
+        $ref: "#/$defs/configuration_binding"
+        description: >
+          Links an OEM-coded, priced option record to the configuration-axis
+          value it identifies. Use for mutually-exclusive configuration forks
+          such as HD diesel engines or EV battery/range packs. The option keeps
+          order-guide metadata (`code`, `msrp`, availability), while the
+          matching configuration carries resolved vehicle state and authoritative
+          base MSRP.
+
+      # Purchasable details
+      code:
+        type: string
+        description: >
+          Canonical OEM identifier used to identify or match this option,
+          regardless of category. Shared across all trims where the option is
+          offered unless an availability object supplies a trim-specific code.
+      msrp:
+        type: integer
+        description: >
+          Default signed price adjustment in the file's market currency shared
+          across all trims where this option is offered. Positive values are
+          upcharges, zero is no-cost, and negative values are OEM-published
+          credits such as feature-delete allowances. Use availability object
+          overrides when pricing varies by trim.
+      msrp_overrides:
+        since: "1.16"
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items:
+          $ref: "#/$defs/msrp_override"
+        description: >
+          Conditional MSRP replacements evaluated against the resolved equipped
+          option set. Each when_equipped value uses requires-style CNF. Matching
+          overrides must agree on MSRP; when none match, the effective option or
+          per-trim msrp remains the fallback. Use this when one buyer-visible
+          option has different prices depending on a co-equipped package, not to
+          split one commercial identity into duplicate options.
+      install_stage:
+        $ref: "#/$defs/install_stage"
+
+      edition:
+        $ref: "#/$defs/edition_kind"
+
+      production_limit:
+        $ref: "#/$defs/production_limit"
+
+      # Package composition
+      includes:
+        type: array
+        items: { $ref: "#/$defs/option_inclusion" }
+        description: References to other option keys in this file
+
+      # Attribute effects when this option is selected
+      modifies:
+        type: object
+        description: >
+          Dot-path attribute effects applied when this option is equipped.
+          Keys are attribute paths like "infotainment.display.size_in".
+
+          Values use one of two forms:
+
+          Bare value (scalar or array) — shorthand for set. Replaces the
+          trim-level attribute value entirely. Use for scalars and for
+          arrays where the option establishes the complete value.
+
+          Effect object — an object with exactly one operation key:
+            set:    Replace the value (explicit form of bare value).
+            append: Add items to an array attribute.
+            remove: Remove items from an array attribute.
+
+          For build simulation, apply each selected option's effects in
+          any order. set is idempotent; append and remove are commutative
+          on sets, so order does not matter. Independently co-selectable
+          options must not mix set/append/remove on the same path, or append
+          and remove the same array item, unless build rules make the
+          combination unreachable. Semantic validation checks effect values
+          against the target attribute schema.
+
+          Color options are normally catalog selections rather than attribute
+          effects. An interior_color may modify interior.surfaces leaves or
+          replace a surface material/color node when the colorway itself causes
+          that physical change. Exterior-color effects are rejected.
+        additionalProperties:
+          $ref: "#/$defs/modifies_value"
+
+      # Build rules
+      requires:
+        type: array
+        description: >
+          CNF (AND-of-ORs) build requirements. The top-level array is
+          conjunctive — every clause must be satisfied. Each clause is
+          either a bare string (a single required option) or an inner
+          array of strings (an OR group — at least one member must be
+          selected).
+
+          Examples:
+            requires: [executive_package]
+              — must have executive_package
+            requires:
+              - [premium_package, executive_package]
+              — must have premium_package OR executive_package
+            requires:
+              - premium_audio
+              - [cold_weather_package, technology_package]
+              — must have premium_audio AND
+                (cold_weather_package OR technology_package)
+
+          Single-member OR groups are forbidden at the schema level
+          (minItems: 2 on inner arrays). Autofix canonicalizes
+          [[x]] -> [x]. Additional operator forms (at_least_n, etc.)
+          may be added later as {type: object} variants in the items
+          oneOf; that extension point is preserved so future additions
+          remain backward-compatible.
+        items:
+          oneOf:
+            - type: string
+            - type: array
+              items: { type: string }
+              minItems: 2
+              uniqueItems: true
+
+      incompatible_with:
+        type: array
+        items: { type: string }
+        description: >
+          References to other option keys that cannot be combined with this
+          option.
+
+          Do not list another option in the SAME resolved selection group
+          here. Radio-group mutual exclusion is an invariant, not a build
+          rule, and autofix silently strips such entries. Same-category
+          interior colors in different explicit groups are co-selectable, so
+          a declared incompatibility between them remains meaningful.
+
+          Cross-category color compatibility is expressed via compatible_with
+          on interior_color options (the canonical direction), not via
+          incompatible_with.
+
+      # Color-specific fields
+      hex:
+        type: string
+        pattern: "^#[a-f0-9]{6}$"
+        description: >
+          Representative hex color. For exterior colors this approximates
+          the paint; for interior colors it approximates the dominant
+          seat/surface tone. Single value — cannot fully represent
+          metallic or pearl finishes.
+      base_color:
+        description: >
+          Standardized base color for filtering and cross-make comparison.
+          Maps the OEM marketing name to a canonical tone.
+          For exterior colors: the dominant body color.
+          For interior colors: the dominant seat/surface tone.
+        type: string
+        enum: [black, white, silver, gray, red, blue, green, yellow,
+               orange, brown, tan, beige, gold, purple, burgundy]
+      paint_finish:
+        description: >
+          Paint finish type. For exterior_color options only.
+          Pearl and tri-coat finishes frequently carry upcharges.
+        type: string
+        enum: [solid, metallic, pearl, matte, satin, gloss, tri_coat, quad_coat]
+      paint_program:
+        since: "1.4"
+        description: >
+          OEM-named custom-paint ordering program. For exterior_color
+          options offered through a separately-marketed program with
+          its own pricing tier and named published catalog (e.g. BMW
+          Individual, Porsche Paint to Sample). Limited-edition or
+          heritage paints from the regular catalog do NOT carry this
+          field — it is reserved for paints that require enrolling in
+          the named program. Sub-program finishes (e.g. BMW Frozen)
+          are captured as the parent program plus paint_finish, not a
+          new program value.
+        $ref: "#/$defs/paint_program"
+      special_order_palette:
+        since: "1.31"
+        description: >
+          Marks the program's special-order entry: the buyer picks the
+          actual paint from this program's palette (the make's
+          paint_palettes.yaml), or, for an open-ended program, has any
+          color matched. Requires paint_program equal to this value and
+          carries no base_color, hex or paint_finish, because the paint
+          varies by car. At most one entry per program in a file. See
+          docs/adr/0016-special-order-paint-palettes.md.
+        $ref: "#/$defs/paint_program"
+
+      # Interior colorway fields
+      palette:
+        type: object
+        required: [primary]
+        minProperties: 2
+        additionalProperties: false
+        description: >
+          Structured tones for a multi-tone Interior Colorway. Single-tone
+          colorways omit palette: primary is implied from base_color and hex.
+          oem_name is authored only when a source explicitly names the tone.
+        properties:
+          primary:
+            $ref: "#/$defs/resolved_color"
+          secondary:
+            $ref: "#/$defs/resolved_color"
+          accent:
+            $ref: "#/$defs/resolved_color"
+
+      palette_role:
+        since: "1.13"
+        type: string
+        enum: [primary, secondary, accent]
+        description: >
+          The one Resolved Interior palette tone supplied by this independently
+          selectable interior_color option. Requires selection_group and
+          base_color, and cannot be combined with a whole-colorway palette.
+
+      # Cross-option compatibility
+      compatible_with:
+        type: object
+        description: >
+          Declares which options in other categories this option can be
+          paired with. Keys are option categories; values are arrays of
+          option keys in that category.
+
+          Convention: always put compatible_with on interior_color options
+          pointing at exterior_color keys — never the reverse.
+          This is the canonical direction; CI should warn if
+          compatible_with appears on exterior_color options.
+
+          When option_rules completeness is "full", absence of
+          compatible_with on an interior color or palette component means it
+          is compatible with all exterior colors for that trim. Every selected
+          component is checked against the chosen exterior color.
+        additionalProperties:
+          type: array
+          items: { type: string }
+
+  paint_program:
+    type: string
+    enum:
+      - bmw_individual
+      - porsche_paint_to_sample
+      - porsche_paint_to_sample_plus
+      - audi_exclusive
+      - mercedes_designo
+      - lexus_takumi
+      - range_rover_sv_bespoke
+      - lincoln_black_label
+      - bentley_mulliner
+      - lamborghini_ad_personam
+      - mclaren_mso
+
+  edition_kind:
+    since: "1.12"
+    type: string
+    enum: [anniversary, launch, final, heritage, collaboration, motorsport]
+    description: >
+      Primary OEM-stated rationale for a bounded special-run model, trim,
+      configuration, or option. Author only when an OEM source both ties the
+      entity to a rationale beyond ordinary lineup identity and positions it
+      as a bounded run rather than a recurring grade. Classify by rationale,
+      not equipment content; occasion takes precedence when rationales overlap.
+      The entity's existing display-name field remains authoritative. This
+      marker does not inherit through trim extends.
+
+  production_limit:
+    since: "1.12"
+    type: object
+    minProperties: 1
+    additionalProperties: false
+    description: >
+      Optional source-backed scarcity detail for an edition. The surrounding
+      vehicle file already supplies market context, so omission of scope means
+      the published limit applies in that market. Author scope: global only
+      when the OEM explicitly describes the limit as worldwide/global. Omit
+      this object when the OEM says only "limited production" without a
+      quantity or explicit global scope.
+    properties:
+      quantity:
+        type: integer
+        minimum: 1
+        description: Explicitly published production or availability cap.
+      scope:
+        type: string
+        enum: [global]
+        description: Explicitly published worldwide/global scope.
+
+  configuration_binding:
+    type: object
+    required: [axis, value]
+    additionalProperties: false
+    properties:
+      axis:
+        $ref: "#/$defs/axis_name"
+        description: Configuration axis this option identifies.
+      value:
+        type: string
+        description: >
+          Axis display value on configurations that this option identifies.
+          Match the configuration's human-facing axis label exactly.
+
+  vin_decode:
+    type: object
+    additionalProperties: false
+    properties:
+      source:
+        oneOf:
+          - type: string          # Backward compat during migration
+          - type: object
+            additionalProperties: false
+            required: [regulation]
+            properties:
+              regulation:
+                type: string
+                description: "Regulatory reference, e.g. '49 CFR 565'"
+              filing_id:
+                type: string
+                description: "NHTSA submission ID, e.g. 'ORG24256'"
+              model_year:
+                type: integer
+                description: "Model year of the CFR filing"
+              notes:
+                type: string
+      wmis:
+        type: array
+        since: "2.0"
+        description: >
+          World Manufacturer Identifiers (VIN positions 1-3) under which
+          this model-year is stamped. Populate only when a source documents
+          a WMI for this model-year (CFR 565 filing, order guide, NHTSA
+          registry). WMIs do NOT identify a specific assembly plant — use
+          the plants block for plant identity. Cross-file consistency:
+          entries sharing the same code across files must have matching
+          metadata.
+        items:
+          type: object
+          required: [code]
+          additionalProperties: false
+          properties:
+            code:
+              type: string
+              pattern: "^[A-HJ-NPR-Z0-9]{3}$"
+              description: 3-char WMI (VIN positions 1-3).
+            country:
+              type: string
+              pattern: "^[A-Z]{2}$"
+              description: Country context (ISO 3166-1 alpha-2).
+            vehicle_type:
+              type: string
+              enum: [passenger_car, mpv, truck, bus, trailer, motorcycle, low_speed, incomplete_vehicle]
+              description: Vehicle type classification from NHTSA WMI registry.
+            name:
+              type: string
+              description: Official WMI designation from the CFR 565 filing.
+            notes:
+              type: string
+      plants:
+        type: array
+        since: "2.0"
+        description: >
+          Assembly plants that produce this model-year. Identified by a
+          short plant code; the vin_code field (VIN position 11)
+          disambiguates plants sharing a WMI. Cross-file consistency:
+          entries sharing the same code across files must have matching
+          metadata.
+        items:
+          type: object
+          required: [code, country]
+          additionalProperties: false
+          properties:
+            code:
+              type: string
+              description: Short plant code used to identify this plant.
+            name:
+              type: string
+              description: Full plant name.
+            city:
+              type: string
+            state:
+              type: string
+              description: State/province (US, CA, etc.).
+            prefecture:
+              type: string
+              description: Prefecture (JP), province (CN, KR), etc.
+            country:
+              type: string
+              pattern: "^[A-Z]{2}$"
+              description: Country of plant location (ISO 3166-1 alpha-2).
+            opened:
+              type: integer
+              minimum: 1886
+              description: Year the plant opened.
+            vin_code:
+              type: string
+              pattern: "^[A-Z0-9]$"
+              description: >
+                Single character identifying this plant in VIN position 11.
+                Source: CFR 565 submission.
+      position_guide:
+        type: object
+        additionalProperties: false
+        patternProperties:
+          "^[4-8]$":
+            type: string
+        description: >
+          Optional human-readable documentation of what each VDS
+          position encodes per the manufacturer's 565 submission.
+          Informational only; not used for decode resolution.
+      patterns:
+        type: array
+        items:
+          $ref: "#/$defs/vin_decode_pattern"
+
+  market:
+    type: object
+    additionalProperties: false
+    required: [country]
+    description: >
+      Sales-market metadata. Files live under a market-explicit data path
+      such as data/us/... and should carry matching market metadata. Non-US
+      files must set this explicitly.
+    properties:
+      country:
+        type: string
+        pattern: "^[A-Z]{2}$"
+        description: Primary sales market country (ISO 3166-1 alpha-2).
+      currency:
+        type: string
+        pattern: "^[A-Z]{3}$"
+        description: Pricing currency (ISO 4217).
+      fuel_economy_standard:
+        type: string
+        enum: [epa, nrcan, wltp, nedc, other]
+        description: Governing fuel-economy/range rating standard for this market.
+      notes:
+        type: string
+
+  vin_decode_pattern:
+    type: object
+    required: [vds, trims]
+    additionalProperties: false
+    properties:
+      vds:
+        type: string
+        pattern: "^[A-Z0-9?]{5}$"
+        description: >
+          VDS string (VIN positions 4-8). ? is a wildcard that matches
+          any single character in that position. Used for positions that
+          don't differentiate trims (e.g. restraint system codes).
+      wmis:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items:
+          type: string
+          pattern: "^[A-HJ-NPR-Z0-9]{3}$"
+        description: >
+          Optional subset of vin_decode.wmis under which this pattern is
+          valid. When omitted, the pattern applies to every file-level WMI.
+          Use this when different CFR 565 filings assign only part of a
+          model-year's VDS matrix to a WMI.
+      trims:
+        type: array
+        items: { type: string }
+        uniqueItems: true
+        description: >
+          Trim keys from the trims section that this VDS pattern
+          can resolve to. When multiple trims share a VDS code
+          (common in hybrid lineups), list all possible trims.
+          An empty list means the VDS resolves to make/model only —
+          CFR565 records the code but does not narrow to a specific
+          trim. When `trims` is empty, `configs` must also be empty
+          (a config narrowing requires at least one trim to anchor to).
+      configs:
+        type: array
+        items: { type: string }
+        uniqueItems: true
+        since: "1.1"
+        description: >
+          Optional config slugs that this VDS pattern narrows to.
+          When present, narrows the VIN decode result to specific
+          configurations within the listed trims. When absent, the
+          VIN decode narrows to trim(s) only. Each entry must
+          reference a config slug that exists within one of the
+          listed trims. CI validates this cross-reference.
+      engine_type:
+        type: string
+      drivetrain:
+        type: string
+      body_style:
+        $ref: "#/$defs/body_style"
+      options:
+        type: array
+        items: { type: string }
+        description: >
+          Option keys from the options section that this VIN pattern
+          indicates are equipped. Used when the VDS encodes option-level
+          detail beyond trim (e.g. moonroof, appearance package).
+
+  # ----------------------------------------------------------
+  # Availability value — simple or extended
+  # ----------------------------------------------------------
+  availability_value:
+    oneOf:
+      # Simple: S, O, U (since 1.21), or null (~)
+      - type: string
+        enum: [S, O, U]
+      - type: "null"
+      # Extended: object form for per-trim overrides (msrp, code,
+      # install_stage, includes, modifies, requires, incompatible_with,
+      # compatible_with).
+      - $ref: "#/$defs/availability_entry"
+      # Multi-entry form for per-config status/commercial differences
+      # inside one trim. Entries must be disjoint under applies_when;
+      # CI enforces that no real configuration matches more than one entry.
+      - type: array
+        minItems: 1
+        items:
+          $ref: "#/$defs/availability_entry"
+
+  availability_entry:
+    type: object
+    required: [status]
+    additionalProperties: false
+    properties:
+      status:
+        type: string
+        enum: [S, O, U]
+      msrp:
+        type: integer
+        description: >
+          Trim-specific signed option price adjustment in the file's market
+          currency.
+      msrp_overrides:
+        since: "1.16"
+        type: array
+        uniqueItems: true
+        items:
+          $ref: "#/$defs/msrp_override"
+        description: >
+          Trim-specific replacement for the option-level msrp_overrides list.
+          An empty list explicitly clears option-level conditional pricing for
+          this trim.
+      code:
+        type: string
+        description: >
+          Trim-specific code override. Prefer option-level code when shared;
+          use this only when the same
+          buyer-facing option has trim-specific order codes.
+      install_stage:
+        $ref: "#/$defs/install_stage"
+      includes:
+        since: "1.5"
+        description: >
+          Trim-specific override of the option-level includes list.
+          Override semantics: when present, replaces the option-level
+          includes for this trim — no merge, no union with the
+          option-level default. An empty list ([]) is a meaningful
+          override meaning "this option includes no other options on
+          this trim."
+        type: array
+        items: { $ref: "#/$defs/option_inclusion" }
+      modifies:
+        since: "1.5"
+        description: >
+          Trim-specific override of the option-level modifies block.
+          Override semantics: when present, replaces the option-level
+          modifies for this trim — no merge, no union with the
+          option-level default. Use only when the same official option
+          identity has different structured effects on different trims.
+        type: object
+        additionalProperties:
+          $ref: "#/$defs/modifies_value"
+      requires:
+        since: "1.4"
+        description: >
+          Trim-specific override of the option-level requires CNF.
+          Same shape as option-level requires (AND-of-ORs). Override
+          semantics: when present, replaces the option-level
+          requires for this trim — no merge, no union with the
+          option-level default. An empty list ([]) is a meaningful
+          override meaning "no prerequisite on this trim, even
+          though the option-level default has one."
+        type: array
+        items:
+          oneOf:
+            - type: string
+            - type: array
+              items: { type: string }
+              minItems: 2
+              uniqueItems: true
+      incompatible_with:
+        since: "1.4"
+        description: >
+          Trim-specific override of the option-level
+          incompatible_with. Override semantics: when present,
+          replaces the option-level list for this trim. An empty
+          list ([]) overrides the option-level default to "no
+          incompatibilities on this trim."
+        type: array
+        items: { type: string }
+      compatible_with:
+        since: "1.19"
+        type: object
+        description: >
+          Trim- or configuration-specific replacement for the option-level
+          compatible_with map. Use when one buyer-visible interior colorway
+          has a stable identity but its exterior-color pairing matrix differs
+          by trim or configuration. Override semantics: when present, replaces
+          the option-level map for this context. An empty map ({}) explicitly
+          clears an option-level restriction. This remains valid only for
+          interior_color options pointing to exterior_color option slugs.
+        additionalProperties:
+          type: array
+          uniqueItems: true
+          items: { type: string }
+      applies_when:
+        description: >
+          Configuration-axis filter. When present, this status (S/O)
+          applies only to configurations of this trim where every
+          listed axis has one of the listed values. Use to express
+          "this option is standard on FWD configs of Base trim but
+          not AWD configs" without splitting the trim. In array form,
+          use one entry per disjoint configuration subset when the same
+          option has different statuses or commercial metadata inside
+          one trim. The filter keys must reference axes declared on the
+          trim's configuration_axes; values must match real
+          configurations. An option that is unrelated to configuration
+          axes should omit this field.
+        type: object
+        additionalProperties:
+          type: array
+          items:
+            oneOf:
+              - type: string
+              - type: integer
+
+  msrp_override:
+    type: object
+    required: [when_equipped, msrp]
+    additionalProperties: false
+    properties:
+      when_equipped:
+        type: array
+        minItems: 1
+        description: >
+          Equipped-option condition in CNF: every outer clause must be
+          satisfied, while an inner array means any referenced option may
+          satisfy that clause. Evaluation uses the resolved equipped set,
+          including standard options and transitive includes.
+        items:
+          oneOf:
+            - type: string
+            - type: array
+              items: { type: string }
+              minItems: 2
+              uniqueItems: true
+      msrp:
+        type: integer
+        description: >
+          Signed replacement option price adjustment when when_equipped
+          matches.
+
+  option_inclusion:
+    oneOf:
+      - type: string
+      - type: object
+        since: "1.25"
+        additionalProperties: false
+        required: [option, unless_equipped]
+        properties:
+          option: { type: string }
+          unless_equipped:
+            type: array
+            minItems: 1
+            uniqueItems: true
+            items: { type: string }
+            description: >
+              Suppress this edge when any guard is in the positive equipped
+              closure before guard filtering and picker displacement. Guards
+              cannot be picker members or descendants of guarded edges.
+
+  modifies_value:
+    description: >
+      A single modifies entry. Either a bare value (shorthand for set)
+      or an effect object with one operation key.
+    anyOf:
+      # Bare scalar — shorthand for set. Booleans are deliberately
+      # excluded: the attribute schema has no boolean attributes, so a
+      # boolean effect value can never validate against a target path.
+      - type: string
+      - type: number
+      # Bare array — shorthand for set
+      - type: array
+      # Bare object — shorthand for node replacement. Operation-key names are
+      # reserved so an object can never be misparsed as an effect.
+      - type: object
+        not:
+          anyOf:
+            - required: [set]
+            - required: [append]
+            - required: [remove]
+            - required: [unless_equipped]
+            - required: [when_equipped]
+      # Effect object — explicit operation
+      - type: object
+        additionalProperties: false
+        properties:
+          set: {}
+          when_equipped:
+            since: "1.33"
+            $ref: "#/$defs/msrp_override/properties/when_equipped"
+            description: >
+              Apply this effect only when every CNF clause is satisfied by the
+              final equipped set, including standard and transitively included
+              options. This does not require or select those options. Combine
+              with unless_equipped for source-backed replacement hardware.
+          unless_equipped:
+            since: "1.24"
+            type: array
+            minItems: 1
+            uniqueItems: true
+            items: { type: string }
+            description: >
+              Suppress this effect when any listed option is in the final
+              equipped set, including standard and transitively included
+              options. Other effects on this option still apply. Use for
+              source-backed replacement hardware, never for precedence by
+              option name or selection order.
+          append:
+            type: array
+          remove:
+            type: array
+        oneOf:
+          - required: [set]
+          - required: [append]
+          - required: [remove]
+
+  resolved_color:
+    type: object
+    required: [base_color]
+    additionalProperties: false
+    properties:
+      base_color:
+        type: string
+        enum: [black, white, silver, gray, red, blue, green, yellow,
+               orange, brown, tan, beige, gold, purple, burgundy]
+      oem_name:
+        type: string
+        minLength: 1
+      hex:
+        type: string
+        pattern: "^#[a-f0-9]{6}$"
+
+  install_stage:
+    type: string
+    enum: [factory, port, dealer]
+    description: >
+      Where the option is installed or fulfilled. Use for accessories or
+      options whose commerce differs from factory equipment.
+
+  named_entity:
+    type: object
+    required: [slug, name]
+    additionalProperties: false
+    properties:
+      slug:
+        type: string
+        pattern: "^[a-z0-9]+(?:_[a-z0-9]+)*$"
+      name:
+        type: string
+        minLength: 1
+
+  body_style:
+    type: string
+    enum: [sedan, coupe, hatchback, wagon, convertible,
+           suv, crossover, truck, van, minivan, cab_chassis]
+    description: >
+      Canonical vehicle body style used for normalized applicability, not OEM
+      marketing category. Use sedan for fixed-roof passenger cars with a
+      separate trunk/decklid, hatchback for hatchback/liftback/fastback
+      passenger cars with a rear hatch or liftgate, and coupe only for
+      fixed-roof two-door cars. Preserve marketing forms such as Gran Coupe,
+      Sportback, or 4-Door Coupe in body_variant. Follows the inheritance
+      chain: model → parent trim chain → trim → configuration. Set at
+      whichever level is appropriate — model level when constant across all
+      configurations (the common case), trim or configuration level when body
+      style varies within the model.
+      CI validates that every configuration resolves to a value.
+
+  axis_name:
+    type: string
+    oneOf:
+      - const: drivetrain
+        title: Drivetrain
+        description: >
+          Drive wheel configuration.
+          Common values: FWD, AWD, 4WD, RWD.
+
+      - const: battery
+        title: Battery
+        description: >
+          Battery-pack variant when an electrified trim offers multiple
+          packs/range configurations.
+          Common values: Standard Range, Extended Range, Long Range, Large Pack.
+
+      - const: body
+        title: Body Style
+        description: >
+          Body variant within a model that shares a trim.
+          Common values: sedan, hatchback, coupe.
+
+      - const: cab
+        title: Cab Style
+        description: >
+          Truck/van cab configuration.
+          Common values: Regular Cab, Quad Cab, Crew Cab, SuperCrew.
+
+      - const: bed
+        title: Bed Length
+        description: >
+          Truck bed length variant.
+          Common values: 5'7", 6'4", 8'.
+
+      - const: wheelbase
+        title: Wheelbase
+        description: >
+          Wheelbase variant when a trim offers multiple orderable chassis
+          lengths. Used primarily on cab-chassis and heavy-duty truck lines.
+          Common values: 145", 169", 193", 205".
+
+      - const: rear_wheels
+        title: Rear Wheels
+        description: >
+          Rear wheel configuration variant — single vs dual rear
+          wheels ("dually"). Used on heavy-duty pickups and
+          cab-chassis trucks.
+          Common values: SRW, DRW.
+
+      - const: transmission
+        title: Transmission
+        description: >
+          Transmission variant.
+          Common values: Automatic, Manual, CVT, DCT.
+
+      - const: seating_capacity
+        title: Seating Capacity
+        description: >
+          Seating capacity variant.
+          Common values: 2, 4, 5, 6, 7, 8.
+
+      - const: engine
+        title: Engine
+        description: >
+          Engine/powertrain variant when a trim offers multiple.
+          Common values: 3.6L V6, 5.7L HEMI V8, 2.5L Hybrid.
+
+      - const: steering_position
+        title: Steering Position
+        description: >
+          Steering position variant.
+          Common values: lhd, rhd.
+
+      - const: tier
+        title: Tier
+        description: >
+          Sub-trim or equipment tier within a trim.
+          Used when OEMs nest levels within a trim name.
+          Common values: Standard, Premium, Launch Edition.

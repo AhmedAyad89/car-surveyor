@@ -1,0 +1,214 @@
+# OpenSpec Chassis Attributes
+# Suspension, brakes, steering, and turning circle.
+
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://openspec.visor.vin/schema/attributes/chassis.json
+title: Chassis Attributes
+type: object
+additionalProperties: false
+
+properties:
+
+  # ── Suspension ───────────────────────────────
+  suspension_front:
+    type: string
+    description: >
+      Front suspension type. Free-form since configurations
+      are too varied to enumerate.
+      Examples: "MacPherson strut", "Double wishbone",
+      "Upper and lower A-arms, coil springs"
+
+  suspension_rear:
+    type: string
+    description: >
+      Rear suspension type.
+      Examples: "Multi-link", "Torsion beam",
+      "5-link, coil springs", "Leaf spring"
+
+  adaptive_suspension:
+    description: >
+      Adaptive/adjustable suspension technologies equipped.
+      Omit if passive only. Multiple values allowed since
+      spring type (air) and damping technology (adaptive_dampers,
+      magnetic_ride) are orthogonal — e.g. [air, magnetic_ride].
+    type: array
+    items:
+      oneOf:
+        - const: adaptive_dampers
+          title: Adaptive Dampers
+          description: Electronically adjustable shock absorbers
+        - const: air
+          title: Air Suspension
+          description: Air spring suspension with ride height adjustment
+        - const: magnetic_ride
+          title: Magnetic Ride Control
+          description: Magneto-rheological damper system
+
+  ride_height_delta_in:
+    type: number
+    since: "1.5"
+    description: >
+      Published factory ride-height change in inches relative to the
+      comparable base suspension in the same model line. Positive
+      values indicate a raised/lifted suspension; negative values
+      indicate a lowered suspension. Omit when the OEM only describes
+      the suspension as "sport-tuned", "off-road-tuned", "lifted", or
+      "lowered" without publishing a numeric delta.
+
+  # ── Brakes ───────────────────────────────────
+  brakes_front:
+    description: Front brake type
+    oneOf:
+      - const: disc
+        title: Disc
+      - const: ventilated_disc
+        title: Ventilated Disc
+      - const: carbon_ceramic
+        title: Carbon Ceramic
+
+  brakes_rear:
+    description: Rear brake type
+    oneOf:
+      - const: drum
+        title: Drum
+      - const: disc
+        title: Disc
+      - const: ventilated_disc
+        title: Ventilated Disc
+      - const: carbon_ceramic
+        title: Carbon Ceramic
+
+  # ── Steering ─────────────────────────────────
+  steering_position:
+    description: >
+      Steering wheel placement. Determined by the vehicle's target
+      market driving side. Omit when the file's market already implies
+      the position unambiguously (e.g. US-market files are always LHD).
+    oneOf:
+      - const: lhd
+        title: Left-Hand Drive
+      - const: rhd
+        title: Right-Hand Drive
+
+  steering_type:
+    description: Power steering technology
+    oneOf:
+      - const: electric
+        title: Electric Power Steering
+      - const: hydraulic
+        title: Hydraulic Power Steering
+      - const: electro_hydraulic
+        title: Electro-Hydraulic Power Steering
+
+  # ── Rear axle / wheels ───────────────────────
+  rear_wheels:
+    description: >
+      Rear wheel configuration. "single" is the standard setup
+      with one wheel per rear hub. "dual" ("dually") pairs two
+      wheels per rear hub, increasing rear track width and load
+      capacity — offered on heavy-duty pickups and cab-chassis
+      trucks. Omit on passenger cars and light-duty trucks where
+      only single rear wheels are offered.
+    oneOf:
+      - const: single
+        title: Single Rear Wheels (SRW)
+      - const: dual
+        title: Dual Rear Wheels (DRW)
+
+  turning_circle_ft:
+    type: number
+    exclusiveMinimum: 0
+    description: Curb-to-curb turning diameter in feet
+
+  # ── Drive Character ──────────────────────────
+  drive_modes:
+    type: array
+    uniqueItems: true
+    description: >
+      Selectable drive modes that adjust powertrain, steering,
+      damping, and traction response. List only modes named by
+      the OEM for this trim. Omit if no driver-selectable mode
+      exists.
+    items:
+      type: string
+      oneOf:
+        - const: eco
+          title: Eco
+        - const: normal
+          title: Normal
+        - const: comfort
+          title: Comfort
+        - const: sport
+          title: Sport
+        - const: sport_plus
+          title: Sport+
+        - const: track
+          title: Track
+        - const: individual
+          title: Individual
+          description: Driver-configurable mode combining settings from others
+        - const: custom
+          title: Custom
+        - const: snow
+          title: Snow
+        - const: slippery
+          title: Slippery
+        - const: mud
+          title: Mud
+        - const: sand
+          title: Sand
+        - const: rock
+          title: Rock / Rock-Crawl
+        - const: tow_haul
+          title: Tow/Haul
+        - const: off_road
+          title: Off-Road
+        - const: baja
+          title: Baja
+        - const: drift
+          title: Drift
+
+  # ── Off-Road Chassis ─────────────────────────
+  off_road_equipment:
+    type: array
+    uniqueItems: true
+    description: >
+      Factory off-road hardware features. Omit if none equipped.
+      Distinct from skid_plates (positional) and
+      safety.off_road_assistance (driver aids) — this array is for
+      presence/absence off-road hardware upgrades.
+    applicability:
+      body_style: [truck, suv, crossover, cab_chassis]
+    items:
+      type: string
+      oneOf:
+        - const: sway_bar_disconnect
+          title: Sway-Bar Disconnect
+          description: >
+            Electronically actuated front anti-roll bar disconnect
+            for increased off-road articulation (e.g. Jeep Wrangler
+            Rubicon, Ford Bronco, Ram Power Wagon).
+        - const: rock_rails
+          title: Rock Rails / Rock Sliders
+          description: >
+            Factory-installed reinforced rocker protection designed
+            for rock-crawling contact (e.g. Jeep Wrangler Rubicon,
+            Ford Bronco, Ram Power Wagon).
+        - const: onboard_air_compressor
+          title: Onboard Air Compressor
+          since: "1.6"
+          description: >
+            Factory-integrated air compressor for airing tires or
+            accessories after off-road use.
+
+  skid_plates:
+    type: array
+    uniqueItems: true
+    description: >
+      Factory underbody skid plate positions equipped.
+      Omit if not equipped.
+    applicability:
+      body_style: [truck, suv, crossover, cab_chassis]
+    items:
+      type: string
+      enum: [engine, transmission, transfer_case, fuel_tank, rear_differential]

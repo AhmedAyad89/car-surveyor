@@ -1,0 +1,86 @@
+# OpenSpec Fuel Economy Attributes
+# EPA-estimated fuel economy, efficiency, and range figures.
+# These frequently vary by configuration (FWD vs AWD, engine choice),
+# so they commonly appear at the configuration level.
+
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://openspec.visor.vin/schema/attributes/fuel_economy.json
+title: Fuel Economy Attributes
+type: object
+additionalProperties: false
+
+properties:
+
+  mpg_city:
+    type: integer
+    exclusiveMinimum: 0
+    description: EPA-estimated city fuel economy (mpg)
+    applicability:
+      engine.type: [gas, diesel, mild_hybrid, hybrid, phev]
+
+  mpg_highway:
+    type: integer
+    exclusiveMinimum: 0
+    description: EPA-estimated highway fuel economy (mpg)
+    applicability:
+      engine.type: [gas, diesel, mild_hybrid, hybrid, phev]
+
+  mpg_combined:
+    type: integer
+    exclusiveMinimum: 0
+    description: EPA-estimated combined fuel economy (mpg)
+    applicability:
+      engine.type: [gas, diesel, mild_hybrid, hybrid, phev]
+
+  mpge_combined:
+    type: integer
+    exclusiveMinimum: 0
+    description: >
+      EPA-estimated combined fuel economy in MPGe.
+      For BEVs, this is the single combined MPGe rating.
+      For PHEVs, this is the electric-mode MPGe (not the
+      blended electricity+gasoline figure). For hydrogen
+      FCEVs, this is the combined MPGe on hydrogen.
+    applicability:
+      engine.type: [bev, phev, hydrogen]
+
+  mpge_city:
+    type: integer
+    exclusiveMinimum: 0
+    description: >
+      EPA-estimated city fuel economy in MPGe.
+      Applicable to BEVs, PHEVs in electric mode, and hydrogen FCEVs.
+    applicability:
+      engine.type: [bev, phev, hydrogen]
+
+  mpge_highway:
+    type: integer
+    exclusiveMinimum: 0
+    description: >
+      EPA-estimated highway fuel economy in MPGe.
+      Applicable to BEVs, PHEVs in electric mode, and hydrogen FCEVs.
+    applicability:
+      engine.type: [bev, phev, hydrogen]
+
+  kwh_per_100mi:
+    type: integer
+    exclusiveMinimum: 0
+    description: >
+      EPA-estimated energy consumption in kWh per 100 miles.
+      The standard EV efficiency metric for electric vehicles.
+      Lower is more efficient.
+    applicability:
+      engine.type: [bev, phev]
+
+  range_mi:
+    type: integer
+    exclusiveMinimum: 0
+    description: >
+      EPA-estimated range in miles. For BEVs, this is total range
+      on a full charge. For PHEVs, this is the electric-only range
+      before the ICE engages. For hydrogen FCEVs, this is total
+      range on a full hydrogen tank. Not applicable to ICE or
+      non-plug-in hybrids, where range is derived from tank size
+      and fuel economy.
+    applicability:
+      engine.type: [bev, phev, hydrogen]

@@ -1,0 +1,61 @@
+# OpenSpec make-level paint palettes (data/{market}/{make}/paint_palettes.yaml).
+#
+# One file per make, keyed by paint program, then by color slug. A palette
+# lists the paints a buyer can choose from when ordering the program's
+# special-order entry: the model-year exterior_color option that carries
+# `special_order_palette: <program>`. Named program paints sold off the
+# regular menu stay ordinary exterior_color options with `paint_program`.
+#
+# See docs/adr/0016-special-order-paint-palettes.md.
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://openspec.visor.vin/schema/paint_palettes.json
+title: OpenSpec Paint Palettes
+type: object
+minProperties: 1
+propertyNames:
+  $ref: "structure.schema.yaml#/$defs/paint_program"
+additionalProperties:
+  type: object
+  minProperties: 1
+  description: >
+    One program's palette. Keys are color slugs: lowercase snake_case from the
+    OEM name, unique within the program.
+  propertyNames:
+    pattern: "^[a-z0-9]+(?:_[a-z0-9]+)*$"
+  additionalProperties:
+    $ref: "#/$defs/palette_color"
+
+$defs:
+  palette_color:
+    type: object
+    required: [name, base_color]
+    additionalProperties: false
+    properties:
+      name:
+        type: string
+        minLength: 1
+        description: >
+          The OEM's own name for the paint, whole (ADR 0015).
+      code:
+        type: string
+        minLength: 1
+        description: >
+          The bare OEM paint code, without ordering-system prefixes (BMW
+          "448", not "P0448"). Unique within the program.
+      hex:
+        $ref: "structure.schema.yaml#/$defs/option/properties/hex"
+      base_color:
+        $ref: "structure.schema.yaml#/$defs/option/properties/base_color"
+      paint_finish:
+        $ref: "structure.schema.yaml#/$defs/option/properties/paint_finish"
+      also_called:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items:
+          type: string
+          minLength: 1
+        description: >
+          Other spellings of this paint printed on window stickers, build
+          records or dealer feeds, for matching only (for example a German
+          spelling or a truncated sticker line). Not display names.

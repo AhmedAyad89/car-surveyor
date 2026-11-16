@@ -1,0 +1,240 @@
+# OpenSpec Dimensions Attributes
+# Physical measurements, capacities, and weight.
+# All lengths in inches unless noted. All weights in lbs.
+
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://openspec.visor.vin/schema/attributes/dimensions.json
+title: Dimensions Attributes
+type: object
+additionalProperties: false
+
+properties:
+
+  # ── Exterior Dimensions ──────────────────────
+  wheelbase_in:
+    type: number
+    exclusiveMinimum: 0
+    description: Wheelbase in inches
+
+  overall_length_in:
+    type: number
+    exclusiveMinimum: 0
+    description: Overall length in inches
+
+  overall_width_in:
+    type: number
+    exclusiveMinimum: 0
+    description: Overall width in inches (excluding mirrors)
+
+  overall_height_in:
+    type: number
+    exclusiveMinimum: 0
+    description: Overall height in inches
+
+  ground_clearance_in:
+    type: number
+    exclusiveMinimum: 0
+    description: Minimum ground clearance in inches
+
+  track_width_front_in:
+    type: number
+    exclusiveMinimum: 0
+    description: Front track width (center-to-center of tires) in inches
+
+  track_width_rear_in:
+    type: number
+    exclusiveMinimum: 0
+    description: Rear track width (center-to-center of tires) in inches
+
+  # ── Interior Dimensions ──────────────────────
+  # Uses "second_row" / "third_row" position naming to match the
+  # vocabulary established in interior.schema.yaml (seat_heating,
+  # second_row_type, etc.) and to avoid ambiguity on 3-row vehicles
+  # where "rear" could mean either the 2nd or 3rd row.
+
+  headroom_front_in:
+    type: number
+    exclusiveMinimum: 0
+    description: Front row headroom in inches
+
+  headroom_second_row_in:
+    type: number
+    exclusiveMinimum: 0
+    description: Second row headroom in inches
+
+  headroom_third_row_in:
+    type: number
+    exclusiveMinimum: 0
+    description: Third row headroom in inches
+
+  legroom_front_in:
+    type: number
+    exclusiveMinimum: 0
+    description: Front row legroom in inches
+
+  legroom_second_row_in:
+    type: number
+    exclusiveMinimum: 0
+    description: Second row legroom in inches
+
+  legroom_third_row_in:
+    type: number
+    exclusiveMinimum: 0
+    description: Third row legroom in inches
+
+  shoulder_room_front_in:
+    type: number
+    exclusiveMinimum: 0
+    description: Front row shoulder room in inches
+
+  shoulder_room_second_row_in:
+    type: number
+    exclusiveMinimum: 0
+    description: Second row shoulder room in inches
+
+  shoulder_room_third_row_in:
+    type: number
+    exclusiveMinimum: 0
+    description: Third row shoulder room in inches
+
+  hip_room_front_in:
+    type: number
+    exclusiveMinimum: 0
+    description: Front row hip room in inches
+
+  hip_room_second_row_in:
+    type: number
+    exclusiveMinimum: 0
+    description: Second row hip room in inches
+
+  hip_room_third_row_in:
+    type: number
+    exclusiveMinimum: 0
+    description: Third row hip room in inches
+
+  # ── Capacities ───────────────────────────────
+  seating_capacity:
+    type: integer
+    minimum: 1
+    maximum: 15
+
+  cargo_volume_cu_ft:
+    type: number
+    exclusiveMinimum: 0
+    description: Cargo volume behind last row of seats, in cu ft
+    applicability:
+      body_style: [suv, crossover, hatchback, wagon, minivan, van]
+
+  cargo_volume_max_cu_ft:
+    type: number
+    exclusiveMinimum: 0
+    description: Maximum cargo volume with rear seats folded, in cu ft
+    applicability:
+      body_style: [suv, crossover, hatchback, wagon, minivan, van]
+
+  trunk_volume_cu_ft:
+    type: number
+    exclusiveMinimum: 0
+    description: Trunk volume in cu ft
+    applicability:
+      body_style: [sedan, coupe, convertible]
+
+  frunk_volume_cu_ft:
+    type: number
+    exclusiveMinimum: 0
+    description: Front trunk (frunk) volume in cu ft
+    applicability:
+      engine.type: [bev]
+
+  bed_length_in:
+    type: number
+    exclusiveMinimum: 0
+    description: Truck bed length in inches
+    applicability:
+      body_style: [truck]
+
+  bed_width_in:
+    type: number
+    exclusiveMinimum: 0
+    description: Truck bed width between wheelhouses in inches
+    applicability:
+      body_style: [truck]
+
+  bed_depth_in:
+    type: number
+    exclusiveMinimum: 0
+    description: Truck bed wall height (depth) in inches
+    applicability:
+      body_style: [truck]
+
+  cab_to_axle_in:
+    type: number
+    exclusiveMinimum: 0
+    since: "1.27"
+    description: >
+      Cab-to-axle (CA) length in inches, from the back of the cab to the
+      rear-axle centerline: the nominal length a chassis cab or cutaway is
+      ordered and upfitted by (e.g. 60, 84, 108, 120). OEM order guides and
+      body-builder books publish it per cab and wheelbase. Author the
+      nominal published value, not a measured one.
+    applicability:
+      body_style: [cab_chassis]
+
+  fuel_tank_gal:
+    type: number
+    exclusiveMinimum: 0
+    description: Fuel tank capacity in gallons
+    applicability:
+      engine.type: [gas, diesel, mild_hybrid, hybrid, phev]
+
+  # ── Off-Road Geometry ────────────────────────
+  approach_angle_deg:
+    type: number
+    exclusiveMinimum: 0
+    description: Maximum approach angle in degrees
+    applicability:
+      body_style: [truck, suv, crossover, cab_chassis]
+
+  departure_angle_deg:
+    type: number
+    exclusiveMinimum: 0
+    description: Maximum departure angle in degrees
+    applicability:
+      body_style: [truck, suv, crossover, cab_chassis]
+
+  breakover_angle_deg:
+    type: number
+    exclusiveMinimum: 0
+    description: Breakover (ramp) angle in degrees
+    applicability:
+      body_style: [truck, suv, crossover, cab_chassis]
+
+  water_fording_in:
+    type: number
+    exclusiveMinimum: 0
+    description: Maximum water fording depth in inches
+    applicability:
+      body_style: [truck, suv, crossover, cab_chassis]
+
+  # ── Weight ───────────────────────────────────
+  curb_weight_lbs:
+    type: integer
+    exclusiveMinimum: 0
+
+  gvwr_lbs:
+    type: integer
+    exclusiveMinimum: 0
+    description: Gross Vehicle Weight Rating in lbs
+
+  # ── Towing / Payload ─────────────────────────
+  max_towing_lbs:
+    type: integer
+    exclusiveMinimum: 0
+    description: Maximum towing capacity in lbs
+
+  max_payload_lbs:
+    type: integer
+    exclusiveMinimum: 0
+    description: Maximum payload capacity in lbs
+    applicability:
+      body_style: [truck, suv, crossover, van, cab_chassis]

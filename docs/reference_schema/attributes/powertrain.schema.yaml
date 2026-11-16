@@ -1,0 +1,645 @@
+# OpenSpec Powertrain Attributes
+# Engine, transmission, drivetrain, and electric/hybrid specifications.
+#
+# Anchor attribute: engine.type must be present even in stub files.
+# It serves as the applicability anchor for electric/hybrid attributes
+# and for ICE-specific sub-properties (configuration, cylinders, etc.).
+
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://openspec.visor.vin/schema/attributes/powertrain.json
+title: Powertrain Attributes
+type: object
+additionalProperties: false
+
+properties:
+
+  # ── Engine ──────────────────────────────────
+  # Properties of the combustion engine itself. For system-level
+  # output (combined ICE + electric), see horsepower / torque_lb_ft.
+  engine:
+    type: object
+    additionalProperties: false
+    properties:
+
+      type:
+        type: string
+        description: >
+          Primary propulsion type. ANCHOR ATTRIBUTE — must be present
+          even in stub files. Other attributes use this value to
+          determine applicability.
+        enum: [gas, cng, diesel, mild_hybrid, hybrid, phev, bev, hydrogen]
+        oneOf:
+          - const: gas
+            title: Gasoline
+          - const: cng
+            title: Compressed Natural Gas
+            since: "1.23"
+            description: Dedicated compressed-natural-gas combustion engine.
+          - const: diesel
+            title: Diesel
+          - const: mild_hybrid
+            title: Mild Hybrid
+            description: >
+              Combustion engine with electric assist for efficiency or
+              performance; cannot drive on electric power alone
+          - const: hybrid
+            title: Hybrid
+            description: Gas engine + electric motor, not plug-in; can drive on electric power at low speeds
+          - const: phev
+            title: Plug-in Hybrid
+            description: Gas engine + electric motor with external charging
+          - const: bev
+            title: Battery Electric
+            description: Fully electric, no combustion engine
+          - const: hydrogen
+            title: Hydrogen Fuel Cell
+            description: >
+              Hydrogen fuel cell generating electricity for electric
+              drive motors; refueled with compressed hydrogen gas
+
+      name:
+        type: string
+        description: >
+          OEM engine family or marketing designation. Free-form since
+          these are manufacturer-specific identifiers that don't
+          canonicalize across makes.
+          Examples: "2.0L Dynamic Force", "5.0L Coyote V8",
+          "3.0L B58 Twin-Scroll Turbo", "Skyactiv-G 2.5T",
+          "2.5L e-BOXER"
+        applicability:
+          engine.type: [gas, cng, diesel, mild_hybrid, hybrid, phev]
+
+      configuration:
+        description: Engine cylinder layout
+        applicability:
+          engine.type: [gas, cng, diesel, mild_hybrid, hybrid, phev]
+        oneOf:
+          - const: inline
+            title: Inline
+            description: Cylinders in a single row (I3, I4, I5, I6)
+          - const: v
+            title: V
+            description: Cylinders in two banks at an angle (V6, V8, V10, V12)
+          - const: flat
+            title: Flat / Boxer
+            description: Horizontally opposed cylinders (Subaru, Porsche)
+          - const: w
+            title: W
+            description: Three or four cylinder banks (VW/Bentley W12, Bugatti W16)
+          - const: rotary
+            title: Rotary (Wankel)
+            description: Rotary engine with no reciprocating pistons (Mazda)
+
+      cylinders:
+        type: integer
+        minimum: 2
+        maximum: 16
+        description: Number of engine cylinders. Omit for rotary engines.
+        applicability:
+          engine.type: [gas, cng, diesel, mild_hybrid, hybrid, phev]
+
+      displacement_liters:
+        type: number
+        exclusiveMinimum: 0
+        description: Engine displacement in liters (e.g. 2.5, 3.6)
+        applicability:
+          engine.type: [gas, cng, diesel, mild_hybrid, hybrid, phev]
+
+      forced_induction:
+        description: Forced induction type. Omit if naturally aspirated.
+        applicability:
+          engine.type: [gas, cng, diesel, mild_hybrid, hybrid, phev]
+        oneOf:
+          - const: turbo
+            title: Turbocharged
+          - const: supercharged
+            title: Supercharged
+          - const: twin_turbo
+            title: Twin-Turbocharged
+          - const: twincharged
+            title: Twincharged
+            description: Supercharger + turbocharger combination
+          - const: e_turbo
+            title: Electric Turbocharger
+
+      fuel_compatibility:
+        type: array
+        since: "1.28"
+        minItems: 1
+        uniqueItems: true
+        description: >
+          OEM-supported fuel families for a gasoline combustion engine.
+          Gasoline includes ordinary permitted ethanol blends; e85 denotes
+          flexible-fuel capability. This is independent of propulsion type
+          and octane grade. Omit when the supported set is unknown.
+        applicability:
+          engine.type: [gas, mild_hybrid, hybrid, phev]
+        items:
+          oneOf:
+            - const: gasoline
+              title: Gasoline
+            - const: e85
+              title: E85 Ethanol
+
+      fuel_grade:
+        description: Minimum required fuel grade
+        applicability:
+          engine.type: [gas, mild_hybrid, hybrid, phev]
+        oneOf:
+          - const: regular
+            title: Regular (87 octane)
+          - const: premium_recommended
+            title: Premium Recommended
+            description: Runs on regular; premium recommended for full performance
+          - const: premium_required
+            title: Premium Required
+            description: Requires 91+ octane fuel
+
+      start_stop:
+        description: >
+          Automatic engine start-stop system that shuts off the ICE at
+          idle and restarts when needed. Omit if not equipped. Applies to
+          mild hybrids, whose belt starter-generator restarts the engine;
+          not applicable to full hybrids or plug-ins, where engine cycling
+          is inherent to the system.
+        applicability:
+          engine.type: [gas, cng, diesel, mild_hybrid]
+        oneOf:
+          - const: basic
+            title: Basic
+            description: >
+              Basic start-stop; engine shuts off at idle and restarts
+              on brake release. Not driver-cancelable.
+          - const: cancelable
+            title: Cancelable
+            description: >
+              Start-stop with a dash button to disable the system for
+              the current drive cycle
+          - const: adaptive
+            title: Adaptive
+            description: >
+              Start-stop that uses navigation, traffic, or driver
+              behavior data to decide when to engage; typically
+              cancelable as well
+
+  # ── System Output ───────────────────────────
+  # These are system-level figures, not engine-only.
+  # For hybrids/PHEVs: combined ICE + electric output.
+  # For BEVs: total electric motor output.
+
+  horsepower:
+    type: integer
+    exclusiveMinimum: 0
+    description: >
+      Peak system horsepower. For hybrids and PHEVs, this is the
+      combined ICE + electric output. For BEVs, this is the total
+      electric motor output.
+
+  torque_lb_ft:
+    type: integer
+    exclusiveMinimum: 0
+    description: >
+      Peak system torque in lb-ft. For hybrids and PHEVs, this is
+      the combined ICE + electric output. For BEVs, this is the
+      total electric motor output.
+
+  zero_to_sixty_s:
+    since: "1.4"
+    type: number
+    exclusiveMinimum: 0
+    description: >
+      Manufacturer-claimed 0-60 mph acceleration time in seconds.
+      OEM-published figure only — independent test results vary by
+      publication, conditions, and date and are not interchangeable.
+      For PHEVs, use the figure for the powertrain mode the OEM
+      headlines (typically with battery support engaged). When the
+      OEM publishes a separate "with launch control" figure, that is
+      the value to record.
+
+  top_speed_mph:
+    since: "1.4"
+    type: integer
+    exclusiveMinimum: 0
+    description: >
+      Manufacturer-claimed top speed in mph. Captures the governed
+      limit when the OEM publishes one (e.g. 155 mph electronic
+      limiter on European-derived performance cars). Trims that ship
+      with a delete option (e.g. M Driver's Package raising the
+      limiter to 174 mph) record the base governed figure here; the
+      delete option modifies this attribute upward via its modifies
+      block.
+
+  # ── Transmission ────────────────────────────
+  transmission:
+    type: object
+    additionalProperties: false
+    properties:
+
+      type:
+        description: Transmission technology
+        oneOf:
+          - const: automatic
+            title: Automatic
+            description: Traditional torque-converter automatic
+          - const: manual
+            title: Manual
+          - const: cvt
+            title: CVT
+            description: Continuously variable transmission
+          - const: dct
+            title: DCT
+            description: Dual-clutch transmission
+          - const: amt
+            title: AMT
+            description: Automated manual transmission
+          - const: direct_drive
+            title: Direct Drive
+            description: Single-speed, typical of BEVs
+          - const: ecvt
+            title: eCVT
+            description: Electronically controlled CVT, common in Toyota hybrids
+
+      speeds:
+        type: integer
+        minimum: 1
+        maximum: 12
+        description: Number of gear ratios. Omit for CVT, eCVT, and direct drive.
+
+      name:
+        type: string
+        description: >
+          OEM transmission designation. Free-form since these are
+          manufacturer-specific identifiers.
+          Examples: "ZF 8HP50", "10R80", "Hydra-Matic 10L90", "PDK"
+
+  # ── Drivetrain ──────────────────────────────
+  drivetrain:
+    type: object
+    additionalProperties: false
+    required: [type]
+    description: >
+      Drive wheel configuration. Use `type` for the canonical
+      cross-make classification and `name` for an OEM marketing
+      designation when published (e.g. "4MOTION", "xDrive",
+      "quattro", "Symmetrical All-Wheel Drive", "4MATIC").
+    properties:
+
+      type:
+        description: Canonical drive wheel configuration.
+        oneOf:
+          - const: fwd
+            title: FWD
+            description: Front-wheel drive
+          - const: rwd
+            title: RWD
+            description: Rear-wheel drive
+          - const: awd
+            title: AWD
+            description: All-wheel drive — includes both full-time and on-demand systems
+          - const: 4wd
+            title: 4WD
+            description: Part-time or selectable four-wheel drive with transfer case
+          - const: 4wd_full_time
+            title: Full-Time 4WD
+            description: Permanent four-wheel drive with center differential
+
+      name:
+        type: string
+        description: >
+          OEM drivetrain designation. Free-form because these are
+          manufacturer-specific names that do not canonicalize across
+          makes. Examples: "4MOTION", "xDrive", "quattro",
+          "Symmetrical All-Wheel Drive", "4MATIC", "SH-AWD",
+          "HTRAC", "e-4ORCE".
+
+  rear_axle_ratio:
+    since: "1.14"
+    type: number
+    exclusiveMinimum: 0
+    description: >
+      Rear axle gear ratio expressed as the numeric ratio to 1, such as
+      3.55 or 4.10. Use the OEM-published axle ratio for rear-wheel-drive
+      and four-wheel-drive vehicles. Keep differential type separate in
+      limited_slip_differential or locking_differentials. Do not use this
+      field for a front-drive transaxle's final-drive ratio.
+
+  # ── Electric / Hybrid ──────────────────────
+  # Grouped as a compound object parallel to engine and transmission.
+  # For BEVs and hydrogen FCEVs, the electric system IS the
+  # propulsion system. For hybrids and PHEVs, these describe
+  # the electric side of the powertrain independently of the ICE.
+  electric:
+    type: object
+    additionalProperties: false
+    applicability:
+      engine.type: [mild_hybrid, hybrid, phev, bev, hydrogen]
+    properties:
+
+      motors:
+        type: integer
+        minimum: 1
+        maximum: 4
+        description: Number of electric drive motors
+        applicability:
+          engine.type: [hybrid, phev, bev, hydrogen]
+
+      motor_hp:
+        type: integer
+        exclusiveMinimum: 0
+        description: >
+          Electric motor output in horsepower, independent of the ICE.
+          For the combined system output, see horsepower.
+          For BEVs and hydrogen FCEVs, this equals horsepower and
+          should be omitted.
+        applicability:
+          engine.type: [hybrid, phev]
+
+      motor_torque_lb_ft:
+        type: integer
+        exclusiveMinimum: 0
+        description: >
+          Electric motor torque in lb-ft, independent of the ICE.
+          For the combined system output, see torque_lb_ft.
+          For BEVs and hydrogen FCEVs, this equals torque_lb_ft and
+          should be omitted.
+        applicability:
+          engine.type: [hybrid, phev]
+
+      battery_capacity_kwh:
+        type: number
+        exclusiveMinimum: 0
+        description: >
+          Usable (net) battery capacity in kWh — the energy available
+          to the driver, not the total gross capacity. Use the EPA label
+          value when available. For mild hybrids, this is the 48V
+          battery capacity (typically 0.4–1.0 kWh).
+        applicability:
+          engine.type: [mild_hybrid, hybrid, phev, bev, hydrogen]
+
+      regen_braking:
+        description: >
+          Highest regenerative braking capability. Omit if the vehicle
+          has no driver-perceptible regenerative braking system.
+        applicability:
+          engine.type: [hybrid, phev, bev, hydrogen]
+        oneOf:
+          - const: basic
+            title: Basic
+            description: >
+              Basic regenerative braking, not driver-adjustable;
+              supplements friction brakes during deceleration
+          - const: adjustable
+            title: Adjustable Levels
+            description: >
+              Driver can select from multiple regenerative braking
+              intensities, typically via paddle shifters or a mode selector
+          - const: one_pedal
+            title: One-Pedal Driving
+            description: >
+              Maximum regen mode that can decelerate the vehicle to
+              a complete stop without the brake pedal; implies
+              adjustable levels are also available
+
+      dc_fast_charging:
+        description: DC fast charging connector type. Omit if not supported.
+        applicability:
+          engine.type: [bev, phev]
+        oneOf:
+          - const: ccs
+            title: CCS
+            description: Combined Charging System (SAE J1772 combo)
+          - const: nacs
+            title: NACS
+            description: North American Charging Standard (Tesla connector)
+          - const: chademo
+            title: CHAdeMO
+
+      public_charging_authentication:
+        since: "1.6"
+        description: >
+          Factory/OEM-supported automatic authentication method for
+          compatible public charging stations. Omit when the vehicle only
+          supports ordinary app, RFID, or credit-card activation.
+        applicability:
+          engine.type: [bev, phev]
+        oneOf:
+          - const: plug_and_charge
+            title: Plug & Charge
+            description: >
+              ISO 15118-style certificate-based charging authentication
+              where the vehicle identifies and authorizes itself after
+              plugging in at compatible stations.
+          - const: autocharge
+            title: Autocharge
+            description: >
+              Network-account-based automatic charging authentication,
+              typically using vehicle or charger identifiers rather than
+              an ISO 15118 Plug & Charge certificate.
+
+      max_dc_charge_rate_kw:
+        type: integer
+        exclusiveMinimum: 0
+        description: >
+          Maximum DC fast-charging power the vehicle itself can accept, in kW.
+          This is the vehicle-side peak, not the nominal rating of a charger or
+          test station used for a published charging-time claim (for example,
+          compatibility with a 350 kW charger does not establish 350 kW vehicle
+          acceptance).
+        applicability:
+          engine.type: [bev, phev]
+
+      max_ac_charge_rate_kw:
+        type: number
+        exclusiveMinimum: 0
+        description: >
+          Maximum onboard AC (Level 2) charging rate in kW. Reflects
+          the onboard charger's ceiling — common values are 7.2, 11,
+          and 19.2 kW. Distinct from the home charger's supply rate.
+        applicability:
+          engine.type: [bev, phev]
+
+      battery_chemistry:
+        description: >
+          Primary battery cell chemistry. Published by most EV
+          manufacturers; affects cold-weather performance, fast-
+          charging behavior, and expected cycle life. Additional
+          chemistries (LMFP, solid-state) will be added as they
+          ship across multiple OEMs. This field records cathode chemistry.
+          Do not map an OEM's generic "Lithium-Ion" or "Lithium-Ion Polymer"
+          battery-type label to LFP, NMC, or NCA without cathode evidence;
+          omit the attribute instead.
+        applicability:
+          engine.type: [bev, phev]
+        oneOf:
+          - const: lfp
+            title: LFP (Lithium Iron Phosphate)
+            description: >
+              Cobalt-free; higher cycle life and thermal stability,
+              lower energy density.
+          - const: nmc
+            title: NMC (Nickel Manganese Cobalt)
+            description: Lithium nickel-manganese-cobalt oxide.
+          - const: nca
+            title: NCA (Nickel Cobalt Aluminum)
+            description: >
+              Lithium nickel-cobalt-aluminum oxide (common in Tesla
+              and Panasonic-supplied packs).
+
+      battery_total_kwh:
+        type: number
+        exclusiveMinimum: 0
+        description: >
+          Total (gross) battery capacity in kWh. Populate only when
+          the OEM publishes total and usable figures separately and
+          the distinction matters to the consumer. Most files should
+          use battery_capacity_kwh (usable/net) alone.
+        applicability:
+          engine.type: [bev, phev]
+
+      thermal_management:
+        type: array
+        uniqueItems: true
+        description: >
+          Traction-battery and cabin thermal system features.
+          Omit if none equipped.
+        applicability:
+          engine.type: [bev, phev]
+        items:
+          type: string
+          oneOf:
+            - const: heat_pump
+              title: Heat Pump
+              description: >
+                Heat pump climate system for cabin and/or battery
+                conditioning, improving efficiency versus purely
+                resistive heat.
+            - const: battery_preconditioning
+              title: Battery Preconditioning
+              description: >
+                Active battery warming (and sometimes cooling) in
+                advance of DC fast charging to maximize charge rate.
+
+      v2l_output_kw:
+        type: number
+        exclusiveMinimum: 0
+        description: >
+          Vehicle-to-load (V2L) outlet maximum output in kW.
+          Powers external devices from the traction battery via a
+          dedicated outlet or adapter. Omit if not equipped.
+        applicability:
+          engine.type: [bev, phev]
+
+      charge_port_location:
+        description: Primary charge port location on the vehicle.
+        applicability:
+          engine.type: [bev, phev]
+        oneOf:
+          - const: front_left
+            title: Front Left
+          - const: front_right
+            title: Front Right
+          - const: rear_left
+            title: Rear Left
+          - const: rear_right
+            title: Rear Right
+          - const: front_center
+            title: Front Center
+            description: Centered in the nose (e.g. Nissan Leaf, Audi e-tron GT).
+
+  # ── Performance & Off-Road Drivetrain ────────
+  # Drivetrain features beyond the core engine/transmission/drivetrain
+  # triad. Most vehicles omit these entirely — presence is the
+  # differentiator.
+
+  performance_features:
+    type: array
+    uniqueItems: true
+    description: >
+      Factory performance drivetrain features. Omit if none
+      equipped.
+    items:
+      type: string
+      oneOf:
+        - const: launch_control
+          title: Launch Control
+          description: >
+            Electronic launch control for optimal acceleration from
+            a standstill.
+        - const: rev_matching
+          title: Automatic Rev-Matching
+          description: >
+            Automatic throttle-blip on downshift in manual
+            transmissions (e.g. Honda Civic Type R, Nissan Z,
+            BMW M, Porsche Auto Blip).
+        - const: active_exhaust
+          title: Active Exhaust
+          description: >
+            Electronically variable exhaust valves that adjust
+            backpressure and sound character.
+        - const: active_sound_design
+          title: Active Sound Design
+          description: >
+            Factory system that electronically augments or synthesizes
+            powertrain sound in the cabin or exterior sound presentation.
+
+  limited_slip_differential:
+    description: >
+      Limited-slip or active differential type. Omit when the
+      vehicle has only an open differential. Values progress from
+      passive mechanical to fully active torque vectoring.
+    oneOf:
+      - const: mechanical
+        title: Mechanical Limited-Slip
+        description: >
+          Passive mechanical LSD (clutch-pack, Torsen, or viscous).
+      - const: electronic
+        title: Electronic Limited-Slip
+        description: >
+          Brake-based or electronically controlled LSD.
+      - const: active_rear
+        title: Active Rear Differential
+        description: >
+          Actively controlled rear differential with torque split
+          between rear wheels (e.g. BMW M Active Differential).
+      - const: torque_vectoring
+        title: Torque Vectoring Differential
+        description: >
+          Fully active differential that can overspeed one wheel
+          relative to the other (e.g. Honda/Acura SH-AWD rear).
+
+  transfer_case:
+    description: >
+      Transfer case type for vehicles with selectable 4WD ranges.
+      Omit on two-wheel-drive vehicles and on single-speed AWD
+      crossovers — their power transfer units are implementation
+      detail, not a shopper spec. Populate when the OEM
+      publishes a 4-high/4-low distinction.
+    applicability:
+      powertrain.drivetrain.type: [4wd, 4wd_full_time]
+    oneOf:
+      - const: two_speed_part_time
+        title: Two-Speed Part-Time
+        description: >
+          High/low range transfer case with no center differential;
+          4WD is driver-selectable and must not be used on dry pavement.
+      - const: two_speed_full_time
+        title: Two-Speed Full-Time
+        description: >
+          High/low range transfer case with center differential;
+          4WD engaged at all times.
+      - const: two_speed_on_demand
+        title: Two-Speed On-Demand
+        description: >
+          High/low range transfer case with automatic engagement
+          (e.g. Jeep Selec-Trac, Toyota Multi-Terrain Select).
+
+  locking_differentials:
+    type: array
+    uniqueItems: true
+    description: >
+      Locking differential positions equipped. Omit if none.
+      Distinct from limited_slip_differential — a locker fully
+      locks both wheels on an axle; an LSD apportions torque.
+    items:
+      type: string
+      enum: [front, center, rear]
