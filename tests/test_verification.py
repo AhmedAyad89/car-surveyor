@@ -217,6 +217,8 @@ def test_check_fee_claim_rejects_a_fee_the_document_does_not_state(
         (claim.TORQUE, "149", "lb.-ft.", "149/89 lb.-ft."),
         (claim.TORQUE, "89", "lb.-ft.", "149/89 lb.-ft."),
         (claim.TORQUE, "202", "Nm", "202 Nm (149 lb.-ft.)"),
+        (claim.TORQUE, "89", "lb. ft.", "121 Nm (89 lb. ft.)"),
+        (claim.TORQUE, "310", "lb ft", "310 lb ft of torque"),
         (claim.MPG_CITY, "28", "MPG", "28/39/32 (LE, SE)"),
         (claim.MPG_HIGHWAY, "39", "MPG", "28/39/32 (LE, SE)"),
         (claim.MPG_COMBINED, "35", "MPG", "HV AWD Limited + Platinum = 35 /34/35"),

@@ -57,6 +57,10 @@ style_values   one row per admitted claim attached to a style, with
 check_results  check_name, style_key, attribute, detail
 ```
 
+- **A snapshot is keyed on its address.** Toyota links one pricing PDF
+  at two addresses, so two snapshots can share a hash and the files
+  stored under it. Claims and extractions are keyed on the hash, so
+  identical bytes are read once.
 - **A style exists only if a document says so.** Styles come from the
   rows of pricing documents. A specification document or the fuel
   economy file never creates one.
@@ -98,7 +102,8 @@ A locator is one of three kinds:
 `evidence.py` says where a quote is. It compares parsed numbers, so
 `495` does not pass inside `$28,495`. It returns the span a prose quote
 was found at. It looks a table cell up by its row label and column
-header, and a label that fits two rows names neither.
+header, and a label that fits two different rows names neither. A row a
+document prints twice, identical in every cell, counts as one.
 
 `verification.py` decides whether that place is the right one:
 
