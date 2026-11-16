@@ -23,6 +23,7 @@ from car_surveyor import (
     source,
     storage,
     verification,
+    viewer,
 )
 from car_surveyor.config import Settings
 from car_surveyor.fetcher import Fetcher
@@ -50,6 +51,9 @@ def main(arguments: Sequence[str] | None = None) -> int:
         print(summary)
         return 0 if is_usable else 1
     settings = Settings() if options.data_dir is None else Settings(data_dir=options.data_dir)
+    if options.stage == "view":
+        # Before anything opens the database for writing: the viewer only reads.
+        return viewer.serve(settings, port=options.port, diff_detail_path=options.diff_detail)
     registry = source.load_registry(settings.registry_path)
     if options.stage in ("diff", "reference-coverage"):
         return run_reference_command(registry, settings, options)
@@ -146,6 +150,22 @@ def build_parser() -> argparse.ArgumentParser:
         "--missing",
         action="store_true",
         help="also list each document that could not be fetched, for downloading by hand",
+    )
+    view = stages.add_parser(
+        "view", help="browse the database, the documents and the diff in a local page"
+    )
+    view.add_argument(
+        "--port",
+        type=int,
+        default=viewer.DEFAULT_PORT,
+        help=f"the port on {viewer.HOST} to serve at; default: {viewer.DEFAULT_PORT}",
+    )
+    view.add_argument(
+        "--diff-detail",
+        type=Path,
+        metavar="FILE",
+        help="the diff's detail file, to show reference values beside the pipeline's; "
+        "it has no default and is refused in an agent session",
     )
     return parser
 

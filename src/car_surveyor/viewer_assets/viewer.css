@@ -1,0 +1,814 @@
+/* The development viewer. Dense tables, system fonts, light and dark. */
+
+:root {
+  color-scheme: light dark;
+  --bg: #ffffff;
+  --fg: #1b1f24;
+  --muted: #5f6b7a;
+  --line: #d6dae0;
+  --head: #f3f5f7;
+  --hover: #eef2f6;
+  --accent: #1f55c4;
+  --accent-soft: #e4ecfb;
+  --open: #8a4b00;
+  --bad: #a3271b;
+  --good: #1d6b32;
+  --mark: #ffe37a;
+  --mark-fg: #1b1f24;
+  --agree: #e2f3e5;
+  --disagree: #fde3df;
+  --pipeline-empty: #efe6fb;
+  --gap: #e1edfc;
+  --reference: #fff3d1;
+  --reference-line: #b98900;
+  --top-height: 41px;
+  --panel-width: min(720px, 48vw);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #15171b;
+    --fg: #e4e7eb;
+    --muted: #9aa5b3;
+    --line: #353a42;
+    --head: #1e2127;
+    --hover: #252a32;
+    --accent: #8db2ff;
+    --accent-soft: #1d2b47;
+    --open: #f0bd5a;
+    --bad: #ff9b8d;
+    --good: #7fd197;
+    --mark: #6d5600;
+    --mark-fg: #fff6d6;
+    --agree: #17341f;
+    --disagree: #47201c;
+    --pipeline-empty: #2f2447;
+    --gap: #172c47;
+    --reference: #3a2f10;
+    --reference-line: #d9a514;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* The page is the height of the window: the top bar, then the view and the
+   panel side by side, each scrolling by itself. */
+html,
+body {
+  height: 100%;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 13px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+.mono,
+code,
+pre {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+a,
+button.link {
+  color: var(--accent);
+}
+
+button,
+select,
+input {
+  font: inherit;
+  color: inherit;
+}
+
+button.link {
+  padding: 0;
+  border: 0;
+  background: none;
+  text-align: left;
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  cursor: pointer;
+}
+
+button.link:hover {
+  text-decoration-color: currentColor;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* --- the top bar ------------------------------------------------------------ */
+
+.top {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 16px;
+  height: var(--top-height);
+  padding: 0 12px;
+  background: var(--head);
+  border-bottom: 1px solid var(--line);
+}
+
+.top h1 {
+  margin: 0;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.top h1 span {
+  font-weight: normal;
+}
+
+#tabs {
+  display: flex;
+  gap: 2px;
+  align-self: stretch;
+}
+
+#tabs a {
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  border-bottom: 2px solid transparent;
+  color: var(--fg);
+  text-decoration: none;
+}
+
+#tabs a:hover {
+  background: var(--hover);
+}
+
+#tabs a[aria-current="page"] {
+  border-bottom-color: var(--accent);
+  font-weight: 600;
+}
+
+.top-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  margin-left: auto;
+}
+
+#data-dir {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reference-badge,
+.badge-reference {
+  padding: 1px 6px;
+  border: 1px solid var(--reference-line);
+  border-radius: 3px;
+  background: var(--reference);
+  white-space: nowrap;
+}
+
+body.showing-reference .top {
+  border-bottom: 2px solid var(--reference-line);
+}
+
+/* --- the page --------------------------------------------------------------- */
+
+.workspace {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+main {
+  flex: 1;
+  min-width: 0;
+  padding: 0 12px 48px;
+  overflow: auto;
+}
+
+main > :first-child {
+  margin-top: 10px;
+}
+
+h2 {
+  margin: 18px 0 6px;
+  font-size: 14px;
+}
+
+h3 {
+  margin: 14px 0 6px;
+  font-size: 13px;
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0;
+}
+
+.controls input[type="search"] {
+  width: 260px;
+}
+
+select,
+input[type="search"],
+button:not(.link):not(.cell):not(.sort):not(.strip-item) {
+  padding: 2px 6px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: var(--bg);
+}
+
+button:not(.link):not(.cell):not(.sort):not(.strip-item):hover {
+  background: var(--hover);
+  cursor: pointer;
+}
+
+.notice {
+  margin: 8px 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--accent);
+  border-radius: 3px;
+  background: var(--head);
+}
+
+main .notice {
+  margin: 8px 0;
+}
+
+.notice p {
+  margin: 4px 0;
+}
+
+.notice.problem {
+  border-left-color: var(--bad);
+}
+
+.notice.reference,
+section.reference > h2,
+.diff-section.reference {
+  border-left: 4px solid var(--reference-line);
+}
+
+.notice.reference {
+  background: var(--reference);
+}
+
+section.reference > h2 {
+  padding-left: 8px;
+}
+
+.attention {
+  margin-bottom: 12px;
+  padding: 2px 10px 10px;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--open);
+  border-radius: 3px;
+}
+
+.side-by-side {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+ul.plain {
+  margin: 4px 0;
+  padding-left: 18px;
+}
+
+ul.columns {
+  margin: 4px 0;
+  padding-left: 18px;
+  columns: 3 260px;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 6px 0;
+  color: var(--muted);
+}
+
+.swatch {
+  display: inline-block;
+  min-width: 22px;
+  padding: 0 4px;
+  border: 1px solid var(--line);
+  color: var(--fg);
+  text-align: center;
+}
+
+/* --- tables ----------------------------------------------------------------- */
+
+table {
+  border-collapse: collapse;
+}
+
+/* A table is as wide as its columns need, so a row reads without a gap. */
+table.grid {
+  max-width: 100%;
+}
+
+.grid th,
+.grid td {
+  padding: 2px 8px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: baseline;
+}
+
+.grid th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--head);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.grid tbody tr:hover {
+  background: var(--hover);
+}
+
+.grid .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.grid td.address {
+  max-width: 520px;
+  overflow-wrap: anywhere;
+}
+
+.grid td.quote-cell {
+  max-width: 420px;
+}
+
+.row-unavailable td {
+  background: color-mix(in srgb, var(--disagree) 45%, transparent);
+}
+
+button.sort {
+  padding: 0;
+  border: 0;
+  background: none;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* One line per style. A long description is cut short; its tooltip and the
+   panel have all of it. */
+.catalogue td {
+  white-space: nowrap;
+}
+
+.catalogue .clip {
+  display: flex;
+  align-items: baseline;
+  max-width: 380px;
+}
+
+body.has-panel .catalogue .clip {
+  max-width: 230px;
+}
+
+.catalogue .clip button {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.catalogue .clip .tag {
+  flex: none;
+}
+
+/* Inside a clipped box the focus ring is drawn inward, or it would be cut off. */
+.catalogue .clip button:focus-visible {
+  outline-offset: -2px;
+}
+
+/* A catalogue cell is a button that fills its table cell. */
+.catalogue td.num {
+  padding: 0;
+}
+
+button.cell {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  width: 100%;
+  padding: 2px 8px;
+  border: 0;
+  background: none;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+button.cell:hover {
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.selected,
+button.cell.selected {
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+/* The three states of a cell. Empty is a dash, never a zero. */
+.empty {
+  color: var(--muted);
+  opacity: 0.7;
+}
+
+.open-values {
+  color: var(--open);
+  font-style: italic;
+}
+
+.cell-open {
+  border-bottom: 1px dashed var(--open);
+}
+
+.contested {
+  color: var(--open);
+  font-weight: 700;
+}
+
+.filled {
+  color: var(--good);
+}
+
+/* The diff's verdict: a tint and a mark, so it does not rest on colour alone. */
+.diff-agree {
+  background: var(--agree);
+}
+
+.diff-disagree {
+  background: var(--disagree);
+}
+
+.diff-pipeline_empty {
+  background: var(--pipeline-empty);
+}
+
+.diff-gap {
+  background: var(--gap);
+}
+
+.diff-mark {
+  color: var(--muted);
+  font-weight: 700;
+}
+
+/* In a catalogue cell the mark sits at the left edge, away from the number. */
+button.cell .diff-mark {
+  margin-right: auto;
+}
+
+.diff-inline {
+  padding: 0 6px;
+  border-radius: 3px;
+}
+
+.reference-value {
+  background: var(--reference);
+}
+
+/* --- small labels ----------------------------------------------------------- */
+
+.tag,
+.badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 5px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  font-size: 11px;
+  line-height: 1.5;
+  white-space: nowrap;
+  color: var(--muted);
+}
+
+.badge:first-child {
+  margin-left: 0;
+}
+
+.tag-finding,
+.badge-conflicting,
+.badge-status-unavailable,
+.badge-status-rejected {
+  border-color: var(--open);
+  color: var(--open);
+}
+
+.badge-chosen,
+.badge-status-admitted,
+.badge-status-fetched {
+  border-color: var(--good);
+  color: var(--good);
+}
+
+.badge-reference {
+  color: var(--fg);
+}
+
+/* --- the panel -------------------------------------------------------------- */
+
+.panel {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  width: var(--panel-width);
+  background: var(--bg);
+  border-left: 1px solid var(--line);
+}
+
+.panel[hidden] {
+  display: none;
+}
+
+.panel-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: var(--head);
+  border-bottom: 1px solid var(--line);
+}
+
+.panel-bar h2 {
+  flex: 1;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.panel-body {
+  flex: 1;
+  padding: 8px 12px 32px;
+  overflow-y: auto;
+}
+
+.style-summary {
+  margin: 0 0 6px;
+}
+
+.state {
+  margin: 8px 0;
+  padding: 4px 8px;
+  border-left: 4px solid var(--good);
+  background: var(--head);
+}
+
+.state-open {
+  border-left-color: var(--open);
+}
+
+.state-unstated {
+  border-left-color: var(--line);
+  color: var(--muted);
+}
+
+.strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+button.strip-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  min-width: 64px;
+  padding: 2px 8px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: var(--bg);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+button.strip-item:hover {
+  background: var(--hover);
+}
+
+button.strip-item[aria-current="true"] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+dl.facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 16px;
+  margin: 4px 0;
+}
+
+dl.facts div {
+  display: flex;
+  gap: 5px;
+}
+
+dl.facts dt,
+dl.fields dt {
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+dl.facts dd,
+dl.fields dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.diff-section {
+  margin: 8px 0;
+  padding: 2px 8px 4px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+}
+
+.diff-section h3 {
+  margin-top: 4px;
+}
+
+section.claim {
+  margin: 8px 0;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--line);
+  border-radius: 3px;
+}
+
+section.claim-chosen {
+  border-left-color: var(--good);
+}
+
+section.claim > header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+}
+
+section.claim .value {
+  font-size: 15px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+section.claim .badge {
+  margin-left: 0;
+}
+
+.problem-text {
+  margin: 4px 0;
+  color: var(--bad);
+}
+
+blockquote.quote {
+  margin: 6px 0;
+  padding: 2px 8px;
+  border-left: 3px solid var(--accent);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.evidence-where {
+  margin: 4px 0 2px;
+}
+
+.evidence-box {
+  position: relative;
+  max-height: 300px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  background: var(--head);
+}
+
+mark {
+  padding: 0 1px;
+  background: var(--mark);
+  color: var(--mark-fg);
+}
+
+pre.context {
+  margin: 0;
+  padding: 6px 8px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.page-break {
+  display: block;
+  margin: 4px 0;
+  border-top: 1px dashed var(--line);
+  color: var(--muted);
+  font-size: 11px;
+  text-align: center;
+}
+
+table.evidence-table {
+  width: 100%;
+  font-size: 12px;
+}
+
+.evidence-table caption {
+  caption-side: bottom;
+  padding: 2px 6px;
+  color: var(--muted);
+  text-align: left;
+}
+
+.evidence-table th,
+.evidence-table td {
+  padding: 1px 6px;
+  border: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.evidence-table th {
+  position: sticky;
+  top: 0;
+  background: var(--bg);
+}
+
+.evidence-table th.located-column {
+  color: var(--accent);
+}
+
+.evidence-table tr.located-row td {
+  background: var(--accent-soft);
+}
+
+.evidence-table td.located-cell {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  font-weight: 600;
+}
+
+dl.fields {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0 12px;
+  margin: 0;
+  padding: 4px 8px;
+}
+
+dl.fields div {
+  display: contents;
+}
+
+dl.fields .located-field dt,
+dl.fields .located-field dd {
+  background: var(--mark);
+  color: var(--mark-fg);
+  font-weight: 600;
+}
+
+details summary {
+  padding: 2px 8px;
+  cursor: pointer;
+}
+
+p.document {
+  margin: 6px 0 0;
+  overflow-wrap: anywhere;
+}
+
+/* In a narrow window the panel covers the view instead of sitting beside it. */
+@media (max-width: 900px) {
+  .panel {
+    position: fixed;
+    top: var(--top-height);
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 2;
+    width: auto;
+  }
+}
