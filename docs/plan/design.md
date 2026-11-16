@@ -1,6 +1,8 @@
 # Design
 
-Detail behind the stages in [README.md](README.md#pipeline). This file
+Detail behind the stages in [README.md](README.md#pipeline). For a
+step-by-step walk-through of the pipeline, read
+[../pipeline.md](../pipeline.md) first. This file
 describes the pipeline as built. Where it differs from the plan of
 2026-11-15, the difference is listed under
 [Changes from the plan](#changes-from-the-plan).

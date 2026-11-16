@@ -9,9 +9,11 @@ OpenSpec, then compares the two and settles every disagreement against a
 primary document. v0 covers Toyota, US, model years 2020 to 2025, and reports
 the pipeline's error rate beside OpenSpec's on the same slice.
 
-The plan is in [docs/plan/](docs/plan/README.md), how the pipeline works is in
-[docs/plan/design.md](docs/plan/design.md), and how it is scored is in
-[docs/plan/evaluation.md](docs/plan/evaluation.md).
+**Start with [docs/pipeline.md](docs/pipeline.md)**: each step of the
+pipeline, what it reads and writes, and where Toyota is built in. The plan
+is in [docs/plan/](docs/plan/README.md), the finer rules behind each step
+are in [docs/plan/design.md](docs/plan/design.md), and how the pipeline is
+scored is in [docs/plan/evaluation.md](docs/plan/evaluation.md).
 
 ## Setup
 
