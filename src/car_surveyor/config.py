@@ -1,4 +1,4 @@
-"""Runtime settings, read from the environment and from `.env`."""
+"""Runtime settings, read from the environment and from `.env.secret`."""
 
 from __future__ import annotations
 
@@ -12,7 +12,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     """Where the pipeline keeps its data and how it identifies itself."""
 
-    model_config = SettingsConfigDict(env_prefix="CAR_SURVEYOR_", env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_prefix="CAR_SURVEYOR_", env_file=".env.secret", extra="ignore"
+    )
 
     data_dir: Path = Path("data")
     registry_path: Path = Path("sources.yaml")
@@ -23,7 +25,7 @@ class Settings(BaseSettings):
     # what an extraction is keyed on, through the model's name.
     extraction_model: str = "claude-opus-5-5"
     extraction_effort: Literal["low", "medium", "high", "xhigh", "max"] = "high"
-    # Read from ANTHROPIC_API_KEY, in the environment or in `.env`. Unset, the
+    # Read from ANTHROPIC_API_KEY, in the environment or in `.env.secret`. Unset, the
     # SDK falls back to an `ant auth login` profile.
     anthropic_api_key: SecretStr | None = Field(default=None, validation_alias="ANTHROPIC_API_KEY")
 
