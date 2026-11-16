@@ -275,6 +275,31 @@ def test_snapshot_documents_fetches_a_direct_source_directly(
     assert failed.detail == "HTTP 500"
 
 
+def test_rederive_snapshots_rebuilds_what_is_derived_from_the_stored_bytes(
+    connection: duckdb.DuckDBPyConnection, settings: Settings, build_pdf: PdfBuilder
+) -> None:
+    table = [["MODEL #", "MSRP"], ["9101", "$28,495"]]
+    stored = snapshot.store_snapshot(
+        connection,
+        settings,
+        url=PRICING_PDF,
+        source_id="toyota_media",
+        kind=source.PRICING_PDF,
+        raw=build_pdf(table=table),
+        media_type="application/pdf",
+        fetch_url=CAPTURE,
+        route=snapshot.WAYBACK,
+    )
+    derived = stored.read_tables()
+    stored.tables_path.write_text("[]", encoding="utf-8")
+    stored.text_path.write_text("stale", encoding="utf-8")
+
+    assert snapshot.rederive_snapshots(connection, settings) == 1
+
+    assert stored.read_tables() == derived
+    assert "$28,495" in stored.read_text()
+
+
 def test_two_addresses_that_serve_the_same_bytes_are_both_kept(
     connection: duckdb.DuckDBPyConnection, settings: Settings
 ) -> None:

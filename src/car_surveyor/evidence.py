@@ -195,14 +195,19 @@ def find_quote(quote: str, source_text: str, *, page: int | None = None) -> Text
     return _find_folded(needle, source_text)
 
 
-def find_cell(tables: Sequence[Table], locator: TableCell) -> FoundCell | str:
+def find_cell(tables: Sequence[Table], locator: TableCell, quote: str = "") -> FoundCell | str:
     """Look a cell up by row label and column header. Returns the cell, or why not.
 
-    The header is the table's first row. A table continued from an earlier
-    page has no header of its own, so the header is then taken from the
-    nearest earlier table with the same number of columns. The row label must
-    equal one cell of exactly one row: a label that fits two different rows
-    names neither. Two rows that are identical in every cell count as one.
+    The header is the table's first row, or its second where the first is
+    only a title. A table continued from an earlier page has no header of its
+    own, so the header is then taken from the nearest earlier table with the
+    same number of columns. The row label must equal one cell of exactly one
+    row: a label that fits two different rows names neither. Two rows that
+    are identical in every cell count as one.
+
+    A header drawn across several columns heads each of them. Where the
+    wanted header heads several, the cell is the one of them that holds the
+    quote, or the first if none does.
     """
     position = next(
         (
@@ -223,12 +228,21 @@ def find_cell(tables: Sequence[Table], locator: TableCell) -> FoundCell | str:
     for candidate in reversed(tables[: position + 1]):
         if not candidate.rows or len(candidate.rows[0]) != len(table.rows[0]):
             continue
-        if wanted_header in [normalize_for_matching(cell) for cell in candidate.rows[0]]:
-            header = candidate.rows[0]
+        header = next(
+            (
+                row
+                for row in _list_header_rows(candidate)
+                if wanted_header in [normalize_for_matching(cell) for cell in row]
+            ),
+            None,
+        )
+        if header is not None:
             break
     if header is None:
         return f"no column is headed {locator.column_header!r}"
-    column_index = [normalize_for_matching(cell) for cell in header].index(wanted_header)
+    columns = [
+        index for index, cell in enumerate(header) if normalize_for_matching(cell) == wanted_header
+    ]
 
     wanted_label = normalize_for_matching(locator.row_label)
     matches = [
@@ -243,7 +257,22 @@ def find_cell(tables: Sequence[Table], locator: TableCell) -> FoundCell | str:
     if len({row for _, row in matches}) > 1:
         return f"{len(matches)} rows are labelled {locator.row_label!r}"
     row_index, row = matches[0]
+    wanted_quote = normalize_for_matching(quote)
+    column_index = next(
+        (
+            index
+            for index in columns
+            if wanted_quote and wanted_quote in normalize_for_matching(row[index])
+        ),
+        columns[0],
+    )
     return FoundCell(row[column_index], row, header, row_index, column_index)
+
+
+def _list_header_rows(table: Table) -> list[tuple[str, ...]]:
+    """A table's header row, and the row under it where the first is only a title."""
+    is_titled = len(table.rows) > 1 and sum(1 for cell in table.rows[0] if cell.strip()) == 1
+    return [table.rows[0], table.rows[1]] if is_titled else [table.rows[0]]
 
 
 def check_grounding(
@@ -271,7 +300,7 @@ def check_cell_grounding(
     problem = _check_quote_holds_value(quote, value)
     if problem is not None:
         return Grounding(False, problem)
-    found = find_cell(tables, locator)
+    found = find_cell(tables, locator, quote)
     if isinstance(found, str):
         return Grounding(False, found)
     if normalize_for_matching(quote) not in normalize_for_matching(found.text):

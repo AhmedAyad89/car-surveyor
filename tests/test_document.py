@@ -41,6 +41,34 @@ def test_merge_sparse_columns_drops_empty_rows_and_pads_short_ones() -> None:
     assert document.merge_sparse_columns([]) == ()
 
 
+def test_a_header_cell_drawn_across_several_columns_heads_each_of_them() -> None:
+    """`i-FORCE` sits over the middle of the three columns its cell is drawn across."""
+    rows = [
+        ["ENGINE", "", "i-FORCE", "", "i-FORCE MAX"],
+        ["Horsepower", "228 hp", "278 hp", "270 hp", "326 hp"],
+    ]
+    spans = [(0, 0), (1, 3), (4, 4)]
+    assert document.merge_sparse_columns(rows, spans)[0] == (
+        "ENGINE",
+        "i-FORCE",
+        "i-FORCE",
+        "i-FORCE",
+        "i-FORCE MAX",
+    )
+    # A cell drawn across the whole table is a title and stays where it is.
+    titled = [["FUEL ECONOMY*", "", ""], ["SR", "20/26/23", "19/24/21"]]
+    assert document.merge_sparse_columns(titled, [(0, 2)])[0] == ("FUEL ECONOMY*", "", "")
+    # Columns that merge into one are one column, so there is nothing to spread across.
+    narrow = [["MODEL #", "", "MSRP"], ["9101", "", "$28,495"]]
+    assert document.merge_sparse_columns(narrow, [(0, 1), (2, 2)])[0] == ("MODEL #", "MSRP")
+
+
+def test_get_column_spans_names_the_columns_a_drawn_cell_lies_across() -> None:
+    boundaries = [76.0, 183.0, 269.0, 365.0, 450.0, 562.0]
+    cells: list[Box] = [(76, 124, 183, 141), (183, 124, 450, 141), (450, 124, 562, 141)]
+    assert document.get_column_spans(cells, boundaries) == [(0, 0), (1, 3), (4, 4)]
+
+
 def test_read_grid_places_words_under_the_header_when_a_row_is_one_wide_cell() -> None:
     """A specification table rules its columns in the header row only."""
     header: list[Box] = [(72, 136, 218, 153), (218, 136, 388, 153), (389, 136, 540, 153)]

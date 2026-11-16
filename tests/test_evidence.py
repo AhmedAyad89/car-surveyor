@@ -237,6 +237,49 @@ def test_find_cell_takes_a_row_the_document_printed_twice() -> None:
     assert evidence.find_cell(repriced, by_code) == "2 rows are labelled '9101'"
 
 
+def test_find_cell_reads_the_header_under_a_title_row() -> None:
+    titled = (
+        Table(
+            1,
+            0,
+            (
+                ("FUEL ECONOMY*", "", "", ""),
+                ("", "4X2 A/T", "4X4 A/T", "4X4 M/T"),
+                ("SR", "20/26/23", "19/24/21", "18/23/20"),
+            ),
+        ),
+    )
+    found = evidence.find_cell(titled, TableCell(1, 0, "SR", "4X4 A/T"))
+    assert isinstance(found, FoundCell)
+    assert (found.text, found.column_index) == ("19/24/21", 2)
+    # A row of headers is not skipped for a second row in a table that has no title.
+    untitled = (Table(1, 0, (("GRADE", "MPG", "RANGE"), ("", "4X2 A/T", ""), ("SR", "20", "400"))),)
+    assert evidence.find_cell(untitled, TableCell(1, 0, "SR", "4X2 A/T")) == (
+        "no column is headed '4X2 A/T'"
+    )
+
+
+def test_find_cell_takes_the_column_that_holds_the_quote_when_several_share_a_header() -> None:
+    """A header drawn across three columns heads each of them."""
+    spanned = (
+        Table(
+            1,
+            0,
+            (
+                ("ENGINE", "i-FORCE", "i-FORCE", "i-FORCE", "i-FORCE MAX"),
+                ("Horsepower", "228 hp", "278 hp", "270 hp", "326 hp"),
+            ),
+        ),
+    )
+    locator = TableCell(1, 0, "Horsepower", "i-FORCE")
+    found = evidence.find_cell(spanned, locator, "270 hp")
+    assert isinstance(found, FoundCell)
+    assert (found.text, found.column_index) == ("270 hp", 3)
+    assert evidence.check_cell_grounding("270 hp", "270", spanned, locator).is_grounded
+    # A figure from under another header is still not under this one.
+    assert not evidence.check_cell_grounding("326 hp", "326", spanned, locator).is_grounded
+
+
 @pytest.mark.parametrize(
     ("locator", "reason"),
     [

@@ -767,7 +767,7 @@ def build_cell_context(locator: TableCell, quote: str, tables: tuple[Table, ...]
     )
     if table is not None:
         context["rows"] = [list(row) for row in table.rows]
-    found = evidence.find_cell(tables, locator)
+    found = evidence.find_cell(tables, locator, quote)
     if isinstance(found, str) or table is None:
         context["problem"] = found if isinstance(found, str) else "the table is not there"
         return context

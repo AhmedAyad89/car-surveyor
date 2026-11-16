@@ -100,6 +100,7 @@ _CYLINDER_PATTERN = re.compile(
     r"\b(?:(v|i)[- ]?(\d{1,2})|(\d{1,2})[- ]?cyl(?:inder)?s?|(four|six|eight)[- ]cylinder)\b"
 )
 _CYLINDER_WORDS = {"four": 4, "six": 6, "eight": 8}
+_CYLINDER_COUNTS = frozenset({3, 4, 5, 6, 8, 10, 12})
 _DISPLACEMENT_PATTERN = re.compile(r"(?<![\d.])(\d\.\d)(?![\d.])")
 _WORD_PATTERN = re.compile(r"[a-z0-9]+")
 
@@ -313,6 +314,10 @@ def infer_from_siblings(styles: list[Style]) -> list[Style]:
     the automatic, and `SR Access Cab 6AT` beside `SR Access Cab V6 6AT` is
     the one that is not a V6. The inference is made only when such a sibling
     exists, and the drive and transmission it gives are marked as inferred.
+
+    Some price lists mark only the manuals: a line's rows print `6MT` or
+    nothing, and never an automatic. There a row that prints nothing is the
+    automatic, whether or not its own grade is sold as a manual.
     """
     groups: dict[tuple[Any, ...], list[Style]] = defaultdict(list)
     for style in styles:
@@ -328,9 +333,15 @@ def infer_from_siblings(styles: list[Style]) -> list[Style]:
             for sibling in siblings
         ):
             updated = replace(updated, drive_class=TWO_WHEEL, is_drive_inferred=True)
-        if style.transmission_class is None and any(
-            sibling.transmission_class == MANUAL and _is_same_except_transmission(style, sibling)
-            for sibling in siblings
+        classes = {sibling.transmission_class for sibling in siblings}
+        is_marking_manuals_only = MANUAL in classes and AUTOMATIC not in classes
+        if style.transmission_class is None and (
+            is_marking_manuals_only
+            or any(
+                sibling.transmission_class == MANUAL
+                and _is_same_except_transmission(style, sibling)
+                for sibling in siblings
+            )
         ):
             updated = replace(updated, transmission_class=AUTOMATIC, is_transmission_inferred=True)
         if style.cylinders is None:
@@ -698,8 +709,8 @@ def get_drive_class(drive: Any) -> str | None:
 
 
 def get_transmission_class(text: str) -> str | None:
-    """Manual or automatic, from designations such as `6MT`, `A91-MT`, `8ECTi`, `6A`, `CVTi-S`."""
-    words = _WORD_PATTERN.findall(text.lower())
+    """Manual or automatic, from designations such as `6MT`, `M/T`, `8ECTi`, `6A`, `CVTi-S`."""
+    words = _WORD_PATTERN.findall(re.sub(r"\b([am])/t\b", r"\1t", text.lower()))
     if any(word == "manual" or re.fullmatch(r"\d?mt", word) for word in words):
         return MANUAL
     is_automatic = any(
@@ -716,7 +727,11 @@ def get_cylinders(text: str) -> int | None:
         return None
     if match.group(4):
         return _CYLINDER_WORDS[match.group(4)]
-    return int(match.group(2) or match.group(3))
+    count = int(match.group(2) or match.group(3))
+    # A header printed `5.7L-V81` is `V8` with a footnote mark run into it.
+    if count not in _CYLINDER_COUNTS and count // 10 in _CYLINDER_COUNTS:
+        return count // 10
+    return count
 
 
 def list_words(text: str) -> list[str]:

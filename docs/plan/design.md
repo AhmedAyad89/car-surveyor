@@ -104,7 +104,10 @@ A locator is one of three kinds:
 `495` does not pass inside `$28,495`. It returns the span a prose quote
 was found at. It looks a table cell up by its row label and column
 header, and a label that fits two different rows names neither. A row a
-document prints twice, identical in every cell, counts as one.
+document prints twice, identical in every cell, counts as one. The
+header is the table's first row, or its second where the first is only a
+title. Where the wanted header heads several columns, the cell is the
+one of them that holds the quote.
 
 `verification.py` decides whether that place is the right one:
 
@@ -127,7 +130,15 @@ Tables are read from the page geometry, not from the cells a PDF draws.
 Toyota's specification tables rule their columns in the header row only,
 and a table continued on a later page has no header. Each word is placed
 by the column its centre falls in, and a continued table takes the
-column boundaries of the table it continues.
+column boundaries of the table it continues. A header cell drawn across
+several columns heads each of them: `i-FORCE` over three columns of
+figures is given to all three. A cell drawn across the whole table is a
+title and is left where it is.
+
+What is derived from a document can be rebuilt from its stored bytes.
+After a change to how documents are read, `snapshot --rederive` derives
+every held document again without fetching, and `verify --recheck`
+checks every claim against the result.
 
 Locations are computed on text derived from the raw bytes, never on a
 library's cleaned output.
@@ -151,7 +162,9 @@ Three things are inferred from the rows printed beside a style, and only
 when such a row exists: `Camry LE` beside `Camry LE AWD` is not
 all-wheel drive, `3.0 Base` beside `3.0 Base MT` is the automatic, and
 `SR Access Cab 6AT` beside `SR Access Cab V6 6AT` is not a V6. The drive
-and transmission so inferred are marked as inferred.
+and transmission so inferred are marked as inferred. Where a line's
+price rows print a manual or nothing, and never an automatic, a row that
+prints nothing is the automatic.
 
 Two things are read from the document itself, and only where it leaves
 no other way to tell its figures apart:

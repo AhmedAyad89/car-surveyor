@@ -189,6 +189,8 @@ def test_get_drive_class(drive: str | None, drive_class: str | None) -> None:
     [
         ("6MT", "manual"),
         ("MT", "manual"),
+        ("6-spd. M/T", "manual"),
+        ("A/T(SR only)", "automatic"),
         ("3.0 A91-MT", "manual"),
         ("Manual 6-spd", "manual"),
         ("8ECTi", "automatic"),
@@ -216,6 +218,9 @@ def test_get_transmission_class(text: str, transmission_class: str | None) -> No
         ("FOUR-CYLINDER", 4),
         ("I4", 4),
         ("XLE V6", 6),
+        ("5.7L V8", 8),
+        ("5.7L-V81", 8),
+        ("V12", 12),
         ("i-FORCE MAX", None),
         ("ENGINE", None),
         ("", None),
@@ -282,6 +287,26 @@ def test_infer_from_siblings_reads_what_the_row_beside_it_implies() -> None:
     assert by_description["Example Base"].is_transmission_inferred
     assert by_description["Example SR 6AT"].excluded_cylinders == {6}
     assert by_description["Example SR V6 6AT"].excluded_cylinders == frozenset()
+    # This line prints an automatic too, so a row that prints neither is unknown.
+    assert by_description["Example XLE"].transmission_class is None
+
+
+def test_a_line_that_marks_only_its_manuals_makes_the_rest_automatic() -> None:
+    styles = resolution.build_styles(
+        [
+            _style_claim("Example SR", grade="SR"),
+            _style_claim("Example SR 6MT", grade="SR", transmission="6MT"),
+            _style_claim("Example SR5", grade="SR5"),
+            _style_claim("Other Core", model="Other", grade="Core"),
+        ],
+        DATES,
+    )
+    by_description = {style.description: style for style in styles}
+    sr5 = by_description["Example SR5"]
+    assert (sr5.transmission_class, sr5.is_transmission_inferred) == ("automatic", True)
+    assert by_description["Example SR 6MT"].transmission_class == "manual"
+    # A line that prints no transmission at all says nothing about any of its rows.
+    assert by_description["Other Core"].transmission_class is None
 
 
 # --- delivery fees ------------------------------------------------------------

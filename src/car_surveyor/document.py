@@ -110,8 +110,23 @@ def _read_pdf(raw: bytes) -> DerivedDocument:
                 ):
                     boundaries = continued_boundaries
                 rows = read_grid(row_cells, words, boundaries)
-                tables.append(Table(page_number, index, merge_sparse_columns(rows)))
+                spans = get_column_spans(row_cells[0], boundaries) if row_cells else []
+                tables.append(Table(page_number, index, merge_sparse_columns(rows, spans)))
     return DerivedDocument(PAGE_BREAK.join(page_texts), tuple(tables))
+
+
+def get_column_spans(cells: list[Box], boundaries: list[float]) -> list[tuple[int, int]]:
+    """The first and last column each drawn cell of a row lies across."""
+    spans: list[tuple[int, int]] = []
+    for box in cells:
+        covered = [
+            column
+            for column, (left, right) in enumerate(pairwise(boundaries))
+            if left >= box[0] - _SAME_EDGE_TOLERANCE and right <= box[2] + _SAME_EDGE_TOLERANCE
+        ]
+        if covered:
+            spans.append((covered[0], covered[-1]))
+    return spans
 
 
 def get_column_boundaries(row_cells: list[list[Box]]) -> list[float]:
@@ -195,7 +210,9 @@ def clean_cell(cell: str | None) -> str:
     return " ".join((cell or "").split())
 
 
-def merge_sparse_columns(rows: list[list[str]]) -> tuple[tuple[str, ...], ...]:
+def merge_sparse_columns(
+    rows: list[list[str]], header_spans: list[tuple[int, int]] | None = None
+) -> tuple[tuple[str, ...], ...]:
     """Merge neighbouring columns that never both hold text in the same row.
 
     A table drawn with merged cells comes out of a PDF with more columns than
@@ -203,6 +220,12 @@ def merge_sparse_columns(rows: list[list[str]]) -> tuple[tuple[str, ...], ...]:
     it. Two neighbours that are never both filled in one row are one column on
     the page, so they are joined. Columns that are both filled somewhere stay
     apart, which keeps a row with a missing value aligned with its header.
+
+    `header_spans` gives, for each cell drawn in the first row, the first and
+    last column it lies across. A header cell drawn across several of the
+    columns that are left heads each of them: `i-FORCE` over three columns of
+    figures is given to all three, though its letters sit over the middle one.
+    A cell drawn across the whole table is a title, and stays where it is.
     """
     if not rows:
         return ()
@@ -218,10 +241,20 @@ def merge_sparse_columns(rows: list[list[str]]) -> tuple[tuple[str, ...], ...]:
         else:
             groups.append([column])
     merged = [
-        tuple(next((row[column] for column in group if row[column]), "") for group in groups)
+        [next((row[column] for column in group if row[column]), "") for group in groups]
         for row in padded
     ]
-    return tuple(row for row in merged if any(row))
+    for first, last in header_spans or []:
+        headed = [
+            position
+            for position, group in enumerate(groups)
+            if first <= group[0] and group[-1] <= last
+        ]
+        texts = [merged[0][position] for position in headed if merged[0][position]]
+        if len(texts) == 1 and 1 < len(headed) < len(groups):
+            for position in headed:
+                merged[0][position] = texts[0]
+    return tuple(tuple(row) for row in merged if any(row))
 
 
 def get_page_text(text: str, page: int) -> str:
