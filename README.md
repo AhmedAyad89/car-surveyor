@@ -71,6 +71,11 @@ none, the document is `unavailable`. `just status --missing` lists each one
 with its address: download it in a browser, put it in `data/inbox/` under its
 original file name, and run `just snapshot` again.
 
+Toyota also updates a price sheet in place at the same address. `just snapshot
+--every-capture` asks the archive for every distinct capture of each held price
+sheet and keeps those it does not hold, so earlier prices become dated values
+beside the later ones. Run `extract`, `verify` and `resolve` afterwards.
+
 ## Scoring against OpenSpec
 
 `just diff dev` reads the OpenSpec bundle at `~/refdata/openspec/` and writes

@@ -3,11 +3,14 @@
 A snapshot is the raw bytes under their SHA-256, the text and tables derived
 from them, and three dates that are never merged: when the document says it
 was written, when an archive captured it, and when the pipeline fetched it.
-An address that already has a snapshot is never fetched again.
+An address that already has a snapshot is never fetched again, except that a
+price sheet Toyota updated in place may be asked for every capture the
+archive holds of it: see `snapshot_captures`.
 """
 
 from __future__ import annotations
 
+import base64
 import hashlib
 import json
 from dataclasses import dataclass
@@ -32,6 +35,13 @@ WAYBACK_AVAILABILITY_ADDRESS = "https://archive.org/wayback/available?url={addre
 # The `id_` flag asks for the capture's bytes as archived, without the
 # archive's banner or rewritten links.
 WAYBACK_CAPTURE_ADDRESS = "https://web.archive.org/web/{timestamp}id_/{address}"
+# Every capture that returned 200, one per distinct content digest, oldest first.
+WAYBACK_INDEX_ADDRESS = (
+    "https://web.archive.org/cdx/search/cdx?url={address}"
+    "&fl=timestamp,digest&filter=statuscode:200&collapse=digest"
+)
+# Documents Toyota updates in place at one address, so each capture may differ.
+DATED_KINDS = (source.PRICING_PDF,)
 
 _EXTENSIONS = {document.PDF: "pdf", document.HTML: "html", document.ZIP: "zip", "text/xml": "xml"}
 _MEDIA_TYPES_BY_SUFFIX = {".pdf": document.PDF, ".zip": document.ZIP, ".html": document.HTML}
@@ -225,6 +235,83 @@ def snapshot_documents(
             source.mark_candidate(connection, candidate.url, "unavailable", problem)
             report.unavailable.append(candidate.url)
     return report
+
+
+def snapshot_captures(
+    connection: duckdb.DuckDBPyConnection,
+    settings: Settings,
+    fetcher: Fetcher,
+    *,
+    model_years: tuple[int, ...] = (),
+) -> SnapshotReport:
+    """Fetch each archived capture of a held price sheet whose content is not held yet.
+
+    The archive's digest of a capture is compared with the held bytes, so a
+    capture already held is never fetched again. A capture is kept as its own
+    snapshot under the same address, with its own capture date, and its
+    prices become dated values beside the others.
+    """
+    report = SnapshotReport([], [], [])
+    for candidate in source.list_candidates(connection, model_years=model_years):
+        held = list_snapshots(connection, settings, url=candidate.url)
+        if candidate.kind not in DATED_KINDS or not held:
+            continue
+        digests = {get_wayback_digest(found.read_raw()) for found in held}
+        held_bytes = {found.sha256 for found in held}
+        try:
+            captures = list_wayback_captures(fetcher, candidate.url)
+        except (LookupError, httpx.HTTPError) as error:
+            report.unavailable.append(f"{candidate.url}: {str(error) or type(error).__name__}")
+            continue
+        for capture_address, capture_date, digest in captures:
+            label = f"{candidate.url} ({capture_date})"
+            if digest in digests:
+                report.already_held.append(label)
+                continue
+            response = fetcher.fetch(capture_address)
+            if not response.is_success or not response.body.startswith(b"%PDF"):
+                report.unavailable.append(f"{label}: not a PDF, HTTP {response.status_code}")
+                continue
+            if hashlib.sha256(response.body).hexdigest() in held_bytes:
+                report.already_held.append(label)
+                continue
+            stored = store_snapshot(
+                connection,
+                settings,
+                url=candidate.url,
+                source_id=candidate.source_id,
+                kind=candidate.kind,
+                raw=response.body,
+                media_type=document.PDF,
+                fetch_url=response.url,
+                route=WAYBACK,
+                capture_date=capture_date,
+            )
+            held_bytes.add(stored.sha256)
+            report.fetched.append(label)
+    return report
+
+
+def list_wayback_captures(fetcher: Fetcher, url: str) -> list[tuple[str, date, str]]:
+    """Each distinct capture of an address: where to fetch it, its date, and its digest."""
+    response = fetcher.fetch(WAYBACK_INDEX_ADDRESS.format(address=quote(url, safe="")))
+    if not response.is_success:
+        raise LookupError(f"HTTP {response.status_code} from the Wayback index")
+    captures: list[tuple[str, date, str]] = []
+    for line in response.body.decode("utf-8", errors="replace").splitlines():
+        fields = line.split()
+        if len(fields) != 2 or len(fields[0]) < 8 or not fields[0].isdigit():
+            continue
+        timestamp, digest = fields
+        capture_date = datetime.strptime(timestamp[:8], "%Y%m%d").date()
+        address = WAYBACK_CAPTURE_ADDRESS.format(timestamp=timestamp, address=url)
+        captures.append((address, capture_date, digest))
+    return captures
+
+
+def get_wayback_digest(raw: bytes) -> str:
+    """The digest the Wayback index gives a capture: the base32 SHA-1 of its bytes."""
+    return base64.b32encode(hashlib.sha1(raw, usedforsecurity=False).digest()).decode("ascii")
 
 
 def find_wayback_capture(fetcher: Fetcher, url: str) -> tuple[str, date] | None:

@@ -55,7 +55,7 @@ def get_archived_address(url: str) -> str | None:
         if parts.query:
             archived = f"{archived}?{parts.query}"
         return _with_scheme(unquote(archived)) if archived else None
-    if parts.path == "/wayback/available":
+    if parts.path in ("/wayback/available", "/cdx/search/cdx"):
         values = parse_qs(parts.query).get("url")
         return _with_scheme(values[0]) if values else None
     return None

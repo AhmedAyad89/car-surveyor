@@ -325,3 +325,99 @@ def test_two_addresses_that_serve_the_same_bytes_are_both_kept(
     held = snapshot.list_snapshots(connection, settings)
     assert sorted(found.url for found in held) == [RELEASE, copy]
     assert snapshot.find_snapshot(connection, settings, copy) == stored[1]
+
+
+INDEX = "https://web.archive.org/cdx/search/cdx"
+
+
+def _hold_capture(
+    connection: duckdb.DuckDBPyConnection, settings: Settings, raw: bytes
+) -> snapshot.Snapshot:
+    _record_pricing_candidate(connection)
+    source.mark_candidate(connection, PRICING_PDF, "fetched")
+    return snapshot.store_snapshot(
+        connection,
+        settings,
+        url=PRICING_PDF,
+        source_id="toyota_media",
+        kind=source.PRICING_PDF,
+        raw=raw,
+        media_type="application/pdf",
+        fetch_url=CAPTURE,
+        route=snapshot.WAYBACK,
+        capture_date=date(2022, 12, 24),
+    )
+
+
+def test_the_wayback_digest_is_the_base32_sha1_of_the_bytes() -> None:
+    assert snapshot.get_wayback_digest(b"") == "3I42H3S6NNFQ2MSVX7XZKYAYSCX5QBYJ"
+
+
+@respx.mock
+def test_snapshot_captures_fetches_each_capture_of_a_price_sheet_not_held_yet(
+    connection: duckdb.DuckDBPyConnection,
+    settings: Settings,
+    fetcher: Fetcher,
+    build_pdf: PdfBuilder,
+) -> None:
+    december = build_pdf([["December prices"]])
+    september = build_pdf([["September prices"]])
+    _hold_capture(connection, settings, december)
+    index = respx.get(INDEX, params={"url": PRICING_PDF}).mock(
+        return_value=httpx.Response(
+            200,
+            text=f"20220927121043 {snapshot.get_wayback_digest(september)}\n"
+            f"20221224052141 {snapshot.get_wayback_digest(december)}\n",
+        )
+    )
+    older = f"https://web.archive.org/web/20220927121043id_/{PRICING_PDF}"
+    respx.get(older).mock(return_value=httpx.Response(200, content=september))
+
+    first = snapshot.snapshot_captures(connection, settings, fetcher)
+    second = snapshot.snapshot_captures(connection, settings, fetcher)
+
+    assert first.fetched == [f"{PRICING_PDF} (2022-09-27)"]
+    assert first.already_held == [f"{PRICING_PDF} (2022-12-24)"]
+    assert second.fetched == []
+    # The index is asked each run; a held capture is never fetched again.
+    assert (index.call_count, fetcher.request_count) == (2, 3)
+    held = snapshot.list_snapshots(connection, settings, url=PRICING_PDF)
+    assert sorted(found.capture_date for found in held if found.capture_date) == [
+        date(2022, 9, 27),
+        date(2022, 12, 24),
+    ]
+    assert {found.read_text() for found in held} == {"December prices", "September prices"}
+
+
+@respx.mock
+def test_snapshot_captures_keeps_nothing_that_is_not_a_pdf(
+    connection: duckdb.DuckDBPyConnection,
+    settings: Settings,
+    fetcher: Fetcher,
+    build_pdf: PdfBuilder,
+) -> None:
+    _hold_capture(connection, settings, build_pdf([["December prices"]]))
+    respx.get(INDEX).mock(return_value=httpx.Response(200, text="20220927121043 ABCDEF\n"))
+    older = f"https://web.archive.org/web/20220927121043id_/{PRICING_PDF}"
+    respx.get(older).mock(return_value=httpx.Response(200, content=b"<html>login</html>"))
+
+    report = snapshot.snapshot_captures(connection, settings, fetcher)
+
+    assert report.fetched == []
+    assert report.unavailable == [f"{PRICING_PDF} (2022-09-27): not a PDF, HTTP 200"]
+    assert len(snapshot.list_snapshots(connection, settings, url=PRICING_PDF)) == 1
+
+
+@respx.mock
+def test_snapshot_captures_reports_an_index_that_does_not_answer(
+    connection: duckdb.DuckDBPyConnection,
+    settings: Settings,
+    fetcher: Fetcher,
+    build_pdf: PdfBuilder,
+) -> None:
+    _hold_capture(connection, settings, build_pdf([["December prices"]]))
+    respx.get(INDEX).mock(return_value=httpx.Response(503))
+
+    report = snapshot.snapshot_captures(connection, settings, fetcher)
+
+    assert report.unavailable == [f"{PRICING_PDF}: HTTP 503 from the Wayback index"]

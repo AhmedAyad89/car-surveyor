@@ -66,6 +66,8 @@ def main(arguments: Sequence[str] | None = None) -> int:
         elif options.stage == "snapshot" and options.rederive:
             count = snapshot.rederive_snapshots(connection, settings)
             print(f"snapshot: derived {count} held documents again; now run verify --recheck")
+        elif options.stage == "snapshot" and options.every_capture:
+            run_snapshot_captures(connection, registry, settings, years)
         elif options.stage == "snapshot":
             run_snapshot(connection, registry, settings, years, options.retry_unavailable)
         elif options.stage == "extract":
@@ -111,6 +113,12 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="fetch nothing: derive the text and tables of every held document again, "
         "after a change to how they are read; run `verify --recheck` afterwards",
+    )
+    snapshots.add_argument(
+        "--every-capture",
+        action="store_true",
+        help="for each held price sheet, fetch every archived capture whose content is not "
+        "held yet; Toyota updates price sheets in place",
     )
     extract = stages.add_parser("extract", parents=[shared], help="read each snapshot once")
     extract.add_argument(
@@ -219,6 +227,21 @@ def run_snapshot(
     )
     print(f"snapshot: {report.describe()}; {fetcher.request_count} requests")
     print_status(source.list_candidates(connection, model_years=years))
+
+
+def run_snapshot_captures(
+    connection: duckdb.DuckDBPyConnection,
+    registry: Registry,
+    settings: Settings,
+    years: tuple[int, ...],
+) -> None:
+    fetcher = Fetcher(registry, settings.user_agent)
+    report = snapshot.snapshot_captures(connection, settings, fetcher, model_years=years)
+    for label in report.fetched:
+        print(f"  fetched: {label}")
+    for problem in report.unavailable:
+        print(f"  unavailable: {problem}")
+    print(f"snapshot --every-capture: {report.describe()}; {fetcher.request_count} requests")
 
 
 def run_extract(
