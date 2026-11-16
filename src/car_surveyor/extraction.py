@@ -46,6 +46,11 @@ PROMPTS_BY_KIND = {
     source.PRODUCT_INFORMATION_PDF: "specification-v1",
 }
 FUEL_ECONOMY_PARSER = "vehicles-csv-v1"
+# The kinds the API reads unless told otherwise. Haiku without thinking read
+# price sheets as well as Claude Code Opus, and located spec sheet figures too
+# poorly to admit (docs/findings/2026-11-16-haiku-vs-opus-extraction.md), so
+# spec sheets are read through `--export` and `--import`.
+API_KINDS = (source.PRICING_PDF,)
 
 # US dollars per million tokens, input then output.
 PRICES_PER_MILLION_TOKENS = {
@@ -340,15 +345,16 @@ def extract_documents(
     settings: Settings,
     extractor: Extractor,
     *,
+    kinds: tuple[str, ...] = tuple(PROMPTS_BY_KIND),
     is_retrying_failed: bool = False,
 ) -> ExtractionReport:
-    """Read every document snapshot this extractor has not read yet.
+    """Read every document snapshot of the given kinds this extractor has not read yet.
 
     A document whose extraction failed is not read again unless told to, so a
     second run makes no model calls.
     """
     report = ExtractionReport()
-    for snapshot in list_snapshots(connection, settings, kinds=tuple(PROMPTS_BY_KIND)):
+    for snapshot in list_snapshots(connection, settings, kinds=kinds):
         extractor_version = get_extractor_version(extractor.label, snapshot.kind)
         status = find_extraction_status(connection, snapshot.sha256, extractor_version)
         if status == "done":
