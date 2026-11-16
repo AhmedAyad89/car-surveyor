@@ -80,6 +80,14 @@ _SECTION_WORDS = frozenset({"engine", "electric", "motor", "hybrid", "power", "s
 # Words that make a different vehicle line when added to a model's name. A
 # document about the Corolla says nothing about the Corolla Cross.
 _LINE_WORDS = frozenset({"hybrid", "prime", "hatchback", "cross", "gr", "crown", "max"})
+# Words that name a body. A document's title may add one for a style whose
+# price row names no body: `Corolla Sedan` covers `Corolla LE`. `Hatchback`
+# names a line of its own and is not one of them.
+_BODY_WORDS = frozenset({"sedan", "coupe", "liftback", "suv", "wagon"})
+# Words that name the axle an electric vehicle's figure is for.
+_AXLE_WORDS = frozenset({"front", "rear"})
+# A figure printed as one of a pair, one per axle: `107/107 HP`, `80 kW/80 kW`.
+_PAIR_PATTERN = re.compile(r"(\d+)\s*[a-z.\-]*\s*/\s*(\d+)", re.IGNORECASE)
 # Words that name a powertrain where a document sets one against another:
 # `Gas` beside `Hybrid`, or `HYBRID` beside `HYBRID MAX`.
 _POWERTRAIN_WORDS = {
@@ -361,6 +369,10 @@ def attach_claims(styles: list[Style], values: list[ValueClaim]) -> list[Attachm
     attachments: list[Attachment] = []
     specification: dict[str, list[ValueClaim]] = defaultdict(list)
     file_rows: dict[tuple[str, str], list[ValueClaim]] = defaultdict(list)
+    priced: dict[str, set[str]] = defaultdict(set)
+    for style in styles:
+        for sha256 in style.snapshots:
+            priced[sha256].add(squash(style.model))
     for value in values:
         if value.value_num is None or value.source_class == claim.ADJUDICATION:
             continue
@@ -368,8 +380,9 @@ def attach_claims(styles: list[Style], values: list[ValueClaim]) -> list[Attachm
             if value.style_key in by_key:
                 attachments.append(_attach(by_key[value.style_key], value, 0))
         elif value.attribute == claim.DELIVERY_FEE:
+            models = frozenset(priced[value.snapshot_sha256])
             for style in styles:
-                matched = match_fee(style, value)
+                matched = match_fee(style, value, models)
                 if matched is not None:
                     attachments.append(_attach(style, value, matched[0], matched[1]))
         elif value.source_class == claim.EPA:
@@ -400,12 +413,19 @@ def choose_values(
     return settled
 
 
-def match_fee(style: Style, fee: ValueClaim) -> tuple[int, str] | None:
+def match_fee(
+    style: Style, fee: ValueClaim, priced_models: frozenset[str] = frozenset()
+) -> tuple[int, str] | None:
     """How many words of a style's line a fee's list of models names, with the name that did.
 
     A fee applies only to styles priced in the same document. `HV` in a list
     is the document's own short form of Hybrid. Of several listed names that
     fit, the one that covers most of the line is the style's.
+
+    A listed name may leave out the performance prefix (`Supra` for the GR
+    Supra), but not when it is itself a model the document prices
+    (`priced_models`, squashed): `Corolla` is then the Corolla's, and says
+    nothing about the GR Corolla.
     """
     if fee.snapshot_sha256 not in style.snapshots:
         return None
@@ -418,6 +438,9 @@ def match_fee(style: Style, fee: ValueClaim) -> tuple[int, str] | None:
             covered = len(named_line)
         elif words and set(words) <= style.line_words and style.model_words - {"gr"} <= set(words):
             # A listed name may leave out the body or the performance prefix.
+            is_other_model = style.model_words - set(words) and "".join(words) in priced_models
+            if is_other_model:
+                continue
             covered = len(set(words))
         else:
             continue
@@ -504,6 +527,15 @@ def read_document_scopes(figures: list[ValueClaim]) -> dict[str, dict[str, Any]]
     `HYBRID MAX`, those words name a powertrain and not an engine. The same
     holds where some of an attribute's figures are for grades marked as
     hybrids (`LE HV`) and others for grades that are not (`LE`).
+
+    Two things a document says about drive are read the same way. Where an
+    engine's fuel economy is given for all-wheel drive in some figures and
+    for no drive in others, the others are the two-wheel-drive figures:
+    documents list the all-wheel-drive figures apart. And where an electric
+    vehicle's power or torque is given for the front axle in some figures
+    and for both axles in others, a figure that states no drive is the
+    front-wheel-drive one if it names the front axle alone, and the
+    all-wheel-drive one if it names both.
     """
     scopes = {figure.claim_id: figure.applies_to for figure in figures}
 
@@ -523,7 +555,7 @@ def read_document_scopes(figures: list[ValueClaim]) -> dict[str, dict[str, Any]]
         for figure, header in cells:
             grades = split_grade_header(header)
             if grades:
-                scopes[figure.claim_id] = {**figure.applies_to, "grades": grades}
+                scopes[figure.claim_id] = {**scopes[figure.claim_id], "grades": grades}
 
     powertrains = {
         figure.claim_id: get_powertrain(str(figure.applies_to.get("engine") or ""))
@@ -558,7 +590,54 @@ def read_document_scopes(figures: list[ValueClaim]) -> dict[str, dict[str, Any]]
                 scopes[claim_id] = {**scope, "grades": named, "powertrain": ["hybrid"]}
             elif not any(marked):
                 scopes[claim_id] = {**scope, "powertrain": ["gas"]}
+    _infer_drives(figures, scopes)
     return scopes
+
+
+def _infer_drives(figures: list[ValueClaim], scopes: dict[str, dict[str, Any]]) -> None:
+    """Give a drive to the figures whose document says it only by setting them apart.
+
+    See `read_document_scopes`. A fuel economy figure with no drive is the
+    two-wheel-drive one only where an all-wheel-drive figure for the same
+    engine shares one of its grades, or neither names a grade: a grade sold
+    only with all-wheel drive is printed without it.
+    """
+    engines: dict[tuple[str, str], list[ValueClaim]] = defaultdict(list)
+    for figure in figures:
+        if figure.attribute in (claim.MPG_CITY, claim.MPG_HIGHWAY, claim.MPG_COMBINED):
+            engine = squash(str(scopes[figure.claim_id].get("engine") or ""))
+            engines[(figure.attribute, engine)].append(figure)
+    for group in engines.values():
+        four_wheel = [
+            _list_grades(scopes[figure.claim_id])
+            for figure in group
+            if get_drive_class(scopes[figure.claim_id].get("drive")) == FOUR_WHEEL
+        ]
+        for figure in group:
+            scope = scopes[figure.claim_id]
+            if scope.get("drive"):
+                continue
+            grades = _list_grades(scope)
+            if any(grades & other or not (grades or other) for other in four_wheel):
+                scopes[figure.claim_id] = {**scope, "drive": "2WD"}
+
+    by_axles: dict[str, list[ValueClaim]] = defaultdict(list)
+    for figure in figures:
+        if _get_axles(figure):
+            by_axles[figure.attribute].append(figure)
+    for group in by_axles.values():
+        if not any(_get_axles(figure) == _AXLE_WORDS for figure in group):
+            continue
+        for figure in group:
+            scope = scopes[figure.claim_id]
+            axles = _get_axles(figure)
+            if scope.get("drive") or axles not in (_AXLE_WORDS, {"front"}):
+                continue
+            scopes[figure.claim_id] = {**scope, "drive": "AWD" if axles == _AXLE_WORDS else "FWD"}
+
+
+def _list_grades(scope: dict[str, Any]) -> frozenset[str]:
+    return frozenset(squash(expand_grade(str(grade))) for grade in scope.get("grades") or [])
 
 
 def split_grade_header(header: str) -> list[str]:
@@ -586,17 +665,22 @@ def match_document(style: Style, model_year: Any, model: str, is_electrified: bo
     The title must name the style's model, must add no word the style lacks,
     and must not skip a word that makes a different line. A hybrid-only model
     is titled without the word Hybrid, so a document that states hybrid
-    system figures is taken to cover the hybrid.
+    system figures is taken to cover the hybrid. A title may add a body
+    (`Corolla Sedan`) where the style's price row names none; that word is
+    not counted, since the style does not confirm it.
     """
     if model_year != style.model_year:
         return None
     words = set(list_words(model))
-    if not words or not words <= style.line_words or not style.model_words <= words:
+    added = words - style.line_words
+    if style.body is None:
+        added -= _BODY_WORDS
+    if not words or added or not style.model_words <= words:
         return None
     skipped = (style.line_words & _LINE_WORDS) - words
     if skipped - ({"hybrid", "max"} if is_electrified else set()):
         return None
-    return len(words)
+    return len(words & style.line_words)
 
 
 def match_fuel_economy_row(style: Style, scope: dict[str, Any]) -> int | None:
@@ -830,14 +914,30 @@ def _attach_specification(
 
 
 def _get_role(figure: ValueClaim) -> str:
-    """Whether a power or torque figure is the engine's, an electric motor's, or the system's."""
+    """Whether a power or torque figure is the engine's, an electric motor's, or the system's.
+
+    A figure the document prints as one of a pair, one per axle (`front/rear
+    124/124 lb.-ft.`), is one motor's, whatever the extractor called it.
+    """
     described = f"{figure.qualifiers.get('describes', '')} {figure.applies_to.get('engine') or ''}"
     words = set(list_words(described))
-    if "motor" in words:
+    if words & {"motor", "motors"}:
+        return "motor"
+    if _get_axles(figure) and any(
+        figure.value_text in pair for pair in _PAIR_PATTERN.findall(figure.quote)
+    ):
         return "motor"
     if words & {"combined", "system", "total"}:
         return "system"
     return "engine"
+
+
+def _get_axles(figure: ValueClaim) -> frozenset[str]:
+    """The axles a power or torque figure's description or quote names: `front`, `rear`."""
+    if figure.attribute not in _CANONICAL_UNITS:
+        return frozenset()
+    described = f"{figure.qualifiers.get('describes', '')} {figure.quote}"
+    return frozenset(list_words(described)) & _AXLE_WORDS
 
 
 def _choose_dated(

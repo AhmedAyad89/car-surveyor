@@ -343,6 +343,16 @@ def test_match_fee_names_a_style_by_the_documents_own_model_list(
     assert resolution.match_fee(style, fee) == matched
 
 
+def test_a_fee_name_without_gr_is_the_plain_models_where_the_document_prices_it() -> None:
+    fee = _fee(["Example", "Supra"])
+    gr_example = _style("GR Example Core", model="GR Example")
+    gr_supra = _style("GR Supra 3.0", model="GR Supra")
+    priced = frozenset({"example", "grexample", "grsupra"})
+    assert resolution.match_fee(gr_example, fee, priced) is None
+    assert resolution.match_fee(gr_supra, fee, priced) == (1, "Supra")
+    assert resolution.match_fee(_style(), fee, priced) == (1, "Example")
+
+
 # --- specification documents --------------------------------------------------
 
 
@@ -360,6 +370,10 @@ def test_match_fee_names_a_style_by_the_documents_own_model_list(
         (_style("Example SR Double Cab", body="Double Cab"), "Example", False, 1),
         (_style("Example Prime SE", powertrain="Prime"), "Example", True, None),
         (_style(model_year=2022), "Example", False, None),
+        (_style(), "Example Sedan", False, 1),
+        (_style("Example Hatchback SE", body="Hatchback"), "Example Sedan", False, None),
+        (_style("GR Example Core", model="GR Example"), "Example Sedan", False, None),
+        (_style(), "Example Hatchback", False, None),
     ],
 )
 def test_match_document_keeps_a_document_to_its_own_vehicle_line(
@@ -394,6 +408,49 @@ def test_a_figure_for_the_styles_drive_beats_one_that_names_its_grade_exactly() 
     resolved = _resolve([awd, fwd], figures)
     assert _chosen(resolved, awd, claim.TORQUE) == 182
     assert _chosen(resolved, fwd, claim.TORQUE) == 184
+
+
+def test_an_undriven_fuel_economy_figure_is_two_wheel_drive_beside_its_awd_twin() -> None:
+    """The document's AWD row names XLE only; XSE AWD takes neither row."""
+    xse_awd = _style("Example XSE AWD", grade="XSE", drive="AWD")
+    xse = _style("Example XSE", grade="XSE", drive_class="2wd")
+    adventure = _style("Example Adventure AWD", grade="Adventure", drive="AWD")
+    figures = [
+        _figure(claim.MPG_CITY, 27, grades=["XLE", "XSE"]),
+        _figure(claim.MPG_CITY, 25, grades=["XLE"], drive="AWD"),
+        # A grade sold only with all-wheel drive is printed without it.
+        _figure(claim.MPG_CITY, 24, grades=["Adventure"]),
+    ]
+    resolved = _resolve([xse_awd, xse, adventure], figures)
+    assert _chosen(resolved, xse_awd, claim.MPG_CITY) is None
+    assert _chosen(resolved, xse, claim.MPG_CITY) == 27
+    assert _chosen(resolved, adventure, claim.MPG_CITY) == 24
+
+
+def test_an_electric_vehicles_per_axle_figures_are_its_motors() -> None:
+    """The bZ4X shape: `front` is the FWD figure, `front/rear` the AWD one."""
+    fwd = _style("eX4 XLE FWD", model="eX4", grade="XLE", drive="FWD")
+    awd = _style("eX4 XLE AWD", model="eX4", grade="XLE", drive="AWD")
+
+    def axle(attribute: str, number: float, quote: str, describes: str, **scope: Any) -> ValueClaim:
+        figure = _figure(attribute, number, model="eX4", describes=describes, **scope)
+        return replace(figure, quote=quote)
+
+    figures = [
+        axle(claim.HORSEPOWER, 201, "FWD: 201 HP (150 kW)", "Power Output, front", drive="FWD"),
+        axle(claim.HORSEPOWER, 214, "AWD: 214 HP", "Power Output, front/rear", drive="AWD"),
+        axle(claim.HORSEPOWER, 107, "107/107 HP", "Power Output, front", drive="AWD"),
+        axle(claim.HORSEPOWER, 107, "107/107 HP", "Power Output, rear", drive="AWD"),
+        axle(claim.TORQUE, 196, "Max Torque, front 196 lb.-ft.", "Max Torque, front"),
+        axle(claim.TORQUE, 124, "Max Torque, front/rear 124/124 lb.-ft.", "Max Torque, front"),
+        axle(claim.TORQUE, 124, "Max Torque, front/rear 124/124 lb.-ft.", "Max Torque, rear"),
+    ]
+    resolved = _resolve([fwd, awd], figures)
+    assert _chosen(resolved, fwd, claim.HORSEPOWER) == 201
+    assert _chosen(resolved, awd, claim.HORSEPOWER) == 214
+    assert _chosen(resolved, fwd, claim.TORQUE) == 196
+    # The document gives each motor's torque and no total: unstated.
+    assert _chosen(resolved, awd, claim.TORQUE) is None
 
 
 def test_a_hybrid_shows_its_system_output_not_its_engine_or_motor() -> None:
