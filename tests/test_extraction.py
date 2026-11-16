@@ -27,7 +27,7 @@ from car_surveyor.extraction import (
     ExtractorResponse,
 )
 from car_surveyor.snapshot import Snapshot
-from car_surveyor.source import Registry
+from car_surveyor.source import Candidate, Registry
 
 PRICING_TEXT = [
     "2023 EXAMPLE FULL-LINE PRICING",
@@ -512,6 +512,25 @@ def test_export_then_import_reads_a_document_without_the_api(
     styles = claim.list_style_claims(connection)
     assert {style.extractor_version for style in styles} == {"another-runner+pricing-v1"}
     assert extraction.export_requests(connection, settings, "another-runner", exchange) == []
+
+
+def test_export_requests_can_be_narrowed_to_model_years(
+    connection: duckdb.DuckDBPyConnection,
+    settings: Settings,
+    pricing_snapshot: Snapshot,
+    tmp_path: Path,
+) -> None:
+    """A document is exported for the model years discovery found it under."""
+    found = Candidate(pricing_snapshot.url, "toyota_media", source.PRICING_PDF, (2022, 2023), "p")
+    source.record_candidate(connection, found)
+    other_years = extraction.export_requests(
+        connection, settings, "another-runner", tmp_path, model_years=(2024, 2025)
+    )
+    its_years = extraction.export_requests(
+        connection, settings, "another-runner", tmp_path, model_years=(2023,)
+    )
+    assert other_years == []
+    assert [path.name for path in its_years] == [f"{pricing_snapshot.sha256}.request.json"]
 
 
 def test_import_answers_reads_a_corrected_answer_file_again(

@@ -367,18 +367,29 @@ def extract_documents(
 
 
 def export_requests(
-    connection: duckdb.DuckDBPyConnection, settings: Settings, label: str, directory: Path
+    connection: duckdb.DuckDBPyConnection,
+    settings: Settings,
+    label: str,
+    directory: Path,
+    *,
+    model_years: tuple[int, ...] = (),
 ) -> list[Path]:
     """Write a request file for every document the labelled extractor has not read.
 
     The request file holds everything, for a program. Beside it go the
-    document as plain text and the answer's schema, for a reader.
+    document as plain text and the answer's schema, for a reader. Model years
+    narrow the export to documents discovered for those years.
     """
     directory.mkdir(parents=True, exist_ok=True)
+    wanted = {
+        candidate.url for candidate in source.list_candidates(connection, model_years=model_years)
+    }
     written: list[Path] = []
     for snapshot in list_snapshots(connection, settings, kinds=tuple(PROMPTS_BY_KIND)):
         extractor_version = get_extractor_version(label, snapshot.kind)
         if find_extraction_status(connection, snapshot.sha256, extractor_version) == "done":
+            continue
+        if model_years and snapshot.url not in wanted:
             continue
         request = build_request(snapshot)
         stem = directory / snapshot.sha256

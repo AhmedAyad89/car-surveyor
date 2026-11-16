@@ -145,6 +145,21 @@ def store_snapshot(
     return snapshot
 
 
+def rederive_snapshots(connection: duckdb.DuckDBPyConnection, settings: Settings) -> int:
+    """Derive every held document's text and tables again from its raw bytes.
+
+    Nothing is fetched. This is for after a change to how documents are read:
+    the stored bytes are the record, and what is derived from them is not.
+    Returns how many documents were derived.
+    """
+    held = {found.sha256: found for found in list_snapshots(connection, settings)}
+    for found in held.values():
+        derived = document.derive_document(found.read_raw(), found.media_type)
+        found.text_path.write_text(derived.text, encoding="utf-8")
+        found.tables_path.write_text(document.serialize_tables(derived.tables), encoding="utf-8")
+    return len(held)
+
+
 def fetch_snapshot(
     connection: duckdb.DuckDBPyConnection,
     settings: Settings,
@@ -201,7 +216,7 @@ def snapshot_documents(
             problem = _snapshot_candidate(
                 connection, registry, settings, fetcher, candidate, is_asking_network
             )
-        except (LookupError, httpx.HTTPError) as error:
+        except (LookupError, httpx.HTTPError, document.UnreadableDocumentError) as error:
             problem = str(error) or type(error).__name__
         if problem is None:
             source.mark_candidate(connection, candidate.url, "fetched")

@@ -172,6 +172,8 @@ def _resolve(styles: list[Style], values: list[ValueClaim]) -> list[Attachment]:
         ("FWD", "2wd"),
         ("Rear-Wheel Drive", "2wd"),
         ("AWD", "4wd"),
+        ("AWD-e", "4wd"),
+        ("AWD-i", "4wd"),
         ("4x4", "4wd"),
         ("Part-time 4-Wheel Drive", "4wd"),
         ("FWD/AWD", None),
@@ -187,12 +189,17 @@ def test_get_drive_class(drive: str | None, drive_class: str | None) -> None:
     [
         ("6MT", "manual"),
         ("MT", "manual"),
+        ("6-spd. M/T", "manual"),
+        ("A/T(SR only)", "automatic"),
         ("3.0 A91-MT", "manual"),
         ("Manual 6-spd", "manual"),
         ("8ECTi", "automatic"),
         ("5ECT", "automatic"),
         ("6A", "automatic"),
         ("CVT", "automatic"),
+        ("CVTi-S", "automatic"),
+        ("ECVT", "automatic"),
+        ("CVT-E", "automatic"),
         ("Automatic (AV-S6)", "automatic"),
         ("Edition A", None),
         ("SE Nightshade", None),
@@ -211,6 +218,9 @@ def test_get_transmission_class(text: str, transmission_class: str | None) -> No
         ("FOUR-CYLINDER", 4),
         ("I4", 4),
         ("XLE V6", 6),
+        ("5.7L V8", 8),
+        ("5.7L-V81", 8),
+        ("V12", 12),
         ("i-FORCE MAX", None),
         ("ENGINE", None),
         ("", None),
@@ -277,6 +287,26 @@ def test_infer_from_siblings_reads_what_the_row_beside_it_implies() -> None:
     assert by_description["Example Base"].is_transmission_inferred
     assert by_description["Example SR 6AT"].excluded_cylinders == {6}
     assert by_description["Example SR V6 6AT"].excluded_cylinders == frozenset()
+    # This line prints an automatic too, so a row that prints neither is unknown.
+    assert by_description["Example XLE"].transmission_class is None
+
+
+def test_a_line_that_marks_only_its_manuals_makes_the_rest_automatic() -> None:
+    styles = resolution.build_styles(
+        [
+            _style_claim("Example SR", grade="SR"),
+            _style_claim("Example SR 6MT", grade="SR", transmission="6MT"),
+            _style_claim("Example SR5", grade="SR5"),
+            _style_claim("Other Core", model="Other", grade="Core"),
+        ],
+        DATES,
+    )
+    by_description = {style.description: style for style in styles}
+    sr5 = by_description["Example SR5"]
+    assert (sr5.transmission_class, sr5.is_transmission_inferred) == ("automatic", True)
+    assert by_description["Example SR 6MT"].transmission_class == "manual"
+    # A line that prints no transmission at all says nothing about any of its rows.
+    assert by_description["Other Core"].transmission_class is None
 
 
 # --- delivery fees ------------------------------------------------------------
@@ -407,6 +437,125 @@ def test_match_scope_does_not_expand_a_range_of_grades() -> None:
     limited = _style("Example Limited", grade="Limited")
     matched = resolution.match_scope(limited, {"grades": ["LE → PLTM"], "drive": "FWD/AWD"})
     assert matched == (0, "grade range not expanded")
+
+
+# --- what a document adds to a figure's scope ----------------------------------
+
+
+def _cell_figure(attribute: str, number: float, header: str, **scope: Any) -> ValueClaim:
+    """A figure read from the column of a specification table that `header` heads."""
+    figure = _figure(attribute, number, **scope)
+    return replace(
+        figure,
+        claim_id=f"{figure.claim_id}-{claim.slugify(header)}",
+        locator=TableCell(1, 0, "Horsepower (SAE Net)", header),
+    )
+
+
+def test_a_column_header_that_lists_grades_tells_two_columns_apart() -> None:
+    """The header is the one the evidence check found above the cell."""
+    le = _style("Example LE")
+    apex = _style("Example SE Apex", grade="SE Apex")
+    nightshade = _style("Example Nightshade", grade="Nightshade")
+    trd = _style("Example TRD", grade="TRD")
+    figures = [
+        _cell_figure(claim.HORSEPOWER, 139, "L, LE, XLE"),
+        _cell_figure(claim.HORSEPOWER, 169, "SE, XSE, NIGHTSHADE, APEX"),
+    ]
+    resolved = _resolve([le, apex, nightshade, trd], figures)
+    assert _chosen(resolved, le, claim.HORSEPOWER) == 139
+    assert _chosen(resolved, apex, claim.HORSEPOWER) == 169
+    assert _chosen(resolved, nightshade, claim.HORSEPOWER) == 169
+    assert _chosen(resolved, trd, claim.HORSEPOWER) is None
+    assert not [a for a in resolved if a.style_key == trd.style_key]
+
+
+@pytest.mark.parametrize(
+    "headers",
+    [
+        ("2.0L", "1.8L"),
+        ("FOUR-CYLINDER", "V6"),
+        ("FWD", "AWD"),
+        ("ENGINE", ""),
+        ("L, LE, XLE", "L, LE, XLE"),
+    ],
+)
+def test_a_header_that_is_not_a_list_of_grades_adds_nothing(headers: tuple[str, str]) -> None:
+    le = _style("Example LE")
+    figures = [
+        _cell_figure(claim.HORSEPOWER, 139, headers[0]),
+        replace(_cell_figure(claim.HORSEPOWER, 169, headers[1]), claim_id="second"),
+    ]
+    resolved = _resolve([le], figures)
+    assert _chosen(resolved, le, claim.HORSEPOWER) is None
+    assert {a.value_num for a in resolved} == {139, 169}
+
+
+def test_a_header_is_not_read_where_the_figures_already_say_what_they_cover() -> None:
+    le = _style("Example LE")
+    figures = [
+        _cell_figure(claim.HORSEPOWER, 139, "SE, XSE", grades=["LE"]),
+        _cell_figure(claim.HORSEPOWER, 169, "L, LE, XLE", grades=["SE"]),
+    ]
+    assert _chosen(_resolve([le], figures), le, claim.HORSEPOWER) == 139
+
+
+def test_gas_set_against_hybrid_names_the_powertrain() -> None:
+    gas = _style("Example LE V6", engine="V6")
+    hybrid = _style("Example Hybrid LE 4-cyl", powertrain="Hybrid", engine="4-cyl")
+    figures = [
+        _figure(claim.TORQUE, 263, grades=["L → PLTM"], engine="Gas"),
+        _figure(claim.TORQUE, 175, grades=["LE → PLTM"], engine="Hybrid"),
+        _figure(claim.HORSEPOWER, 295, grades=["L → PLTM"], engine="Gas"),
+        _figure(claim.HORSEPOWER, 243, engine="Hybrid", describes="Combined net hp"),
+    ]
+    resolved = _resolve([gas, hybrid], figures)
+    assert _chosen(resolved, gas, claim.TORQUE) == 263
+    assert _chosen(resolved, hybrid, claim.TORQUE) == 175
+    assert _chosen(resolved, gas, claim.HORSEPOWER) == 295
+    assert _chosen(resolved, hybrid, claim.HORSEPOWER) == 243
+
+
+def test_hybrid_set_against_hybrid_max_names_the_powertrain() -> None:
+    hybrid = _style("Example XLE Hybrid", grade="XLE", powertrain="Hybrid")
+    stronger = _style("Example Platinum Hybrid MAX", grade="Platinum", powertrain="Hybrid MAX")
+    figures = [
+        _figure(claim.TORQUE, 163, grades=[], engine="HYBRID", describes="engine"),
+        _figure(claim.TORQUE, 332, grades=[], engine="HYBRID MAX", describes="engine"),
+        _figure(claim.HORSEPOWER, 236, engine="HYBRID", describes="combined net"),
+        _figure(claim.HORSEPOWER, 340, engine="HYBRID MAX", describes="combined net"),
+    ]
+    resolved = _resolve([hybrid, stronger], figures)
+    assert _chosen(resolved, hybrid, claim.TORQUE) == 163
+    assert _chosen(resolved, stronger, claim.TORQUE) == 332
+    assert _chosen(resolved, hybrid, claim.HORSEPOWER) == 236
+    assert _chosen(resolved, stronger, claim.HORSEPOWER) == 340
+
+
+def test_one_powertrain_word_alone_is_a_section_title() -> None:
+    """A model sold only as a hybrid is priced without the word, and still takes the figure."""
+    only_hybrid = _style("Example LE")
+    figures = [_figure(claim.TORQUE, 176, grades=[], engine="Hybrid")]
+    assert _chosen(_resolve([only_hybrid], figures), only_hybrid, claim.TORQUE) == 176
+    assert resolution.get_powertrain("HYBRID MAX") == {"hybrid", "max"}
+    assert resolution.get_powertrain("Gasoline engine") == frozenset()
+    assert resolution.get_powertrain("i-FORCE MAX") == frozenset()
+
+
+def test_a_grade_marked_as_the_hybrid_is_kept_from_the_gasoline_style() -> None:
+    gas = _style("Example LE V6", engine="V6")
+    hybrid = _style("Example Hybrid LE 4-cyl", powertrain="Hybrid", engine="4-cyl")
+    limited = _style("Example Hybrid LTD 4-cyl", grade="LTD", powertrain="Hybrid")
+    figures = [
+        _figure(claim.MPG_COMBINED, 23, grades=["LE"]),
+        _figure(claim.MPG_COMBINED, 36, grades=["LE HV"]),
+        _figure(claim.MPG_COMBINED, 35, grades=["XLE HV → PLTM HV"]),
+        _figure(claim.HORSEPOWER, 243, describes="Combined net hp"),
+    ]
+    resolved = _resolve([gas, hybrid, limited], figures)
+    assert _chosen(resolved, gas, claim.MPG_COMBINED) == 23
+    assert _chosen(resolved, hybrid, claim.MPG_COMBINED) == 36
+    assert _chosen(resolved, limited, claim.MPG_COMBINED) == 35
 
 
 # --- the fuel economy file ----------------------------------------------------

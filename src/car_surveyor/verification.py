@@ -329,10 +329,12 @@ def _is_number_beside(number: object, words: tuple[str, ...], quote: str) -> boo
             if not tokens[position + 1][0].isdigit():
                 break
             position += 2
-        for following in tokens[position : position + 4]:
+        for offset, following in enumerate(tokens[position : position + 4], start=position):
             if following[0].isdigit():
                 break
-            if _fold_unit(following) in words:
+            # A unit can be printed as two words: `lb. ft.` for `lb-ft`.
+            paired = following + "".join(tokens[offset + 1 : offset + 2])
+            if _fold_unit(following) in words or _fold_unit(paired) in words:
                 return True
         is_unit_before = index > 0 and _fold_unit(tokens[index - 1]) in words
         if is_unit_before and not (index > 1 and tokens[index - 2][0].isdigit()):

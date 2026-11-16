@@ -47,6 +47,10 @@ The stage recipes take `--years 2023` to work on some model years only, and
 `--retry-unavailable` to ask again for what an earlier run could not get. A
 second run of a stage makes no requests and no model calls.
 
+After a change to how documents are read, `just snapshot --rederive` derives
+every held document's text and tables again from its stored bytes, without
+fetching, and `just verify --recheck` checks every claim against the result.
+
 `just extract` calls the Claude API, with the key from `ANTHROPIC_API_KEY` in
 `.env` or an `ant auth login` profile. The model is `claude-opus-5-5` unless
 `CAR_SURVEYOR_EXTRACTION_MODEL` says otherwise. Without credentials, another

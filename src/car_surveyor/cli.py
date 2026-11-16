@@ -63,6 +63,9 @@ def main(arguments: Sequence[str] | None = None) -> int:
     try:
         if options.stage == "discover":
             run_discover(connection, registry, settings, years, options.retry_unavailable)
+        elif options.stage == "snapshot" and options.rederive:
+            count = snapshot.rederive_snapshots(connection, settings)
+            print(f"snapshot: derived {count} held documents again; now run verify --recheck")
         elif options.stage == "snapshot":
             run_snapshot(connection, registry, settings, years, options.retry_unavailable)
         elif options.stage == "extract":
@@ -100,8 +103,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="ask again for addresses an earlier run found unavailable",
     )
     stages.add_parser("discover", parents=[shared, fetching], help="record candidate documents")
-    stages.add_parser(
+    snapshots = stages.add_parser(
         "snapshot", parents=[shared, fetching], help="fetch each candidate document once"
+    )
+    snapshots.add_argument(
+        "--rederive",
+        action="store_true",
+        help="fetch nothing: derive the text and tables of every held document again, "
+        "after a change to how they are read; run `verify --recheck` afterwards",
     )
     extract = stages.add_parser("extract", parents=[shared], help="read each snapshot once")
     extract.add_argument(
@@ -226,7 +235,11 @@ def run_extract(
             return 2
         if options.export is not None:
             written = extraction.export_requests(
-                connection, settings, options.label, options.export
+                connection,
+                settings,
+                options.label,
+                options.export,
+                model_years=tuple(options.years or ()),
             )
             print(f"extract: wrote {len(written)} request files to {options.export}/")
             return 0

@@ -204,6 +204,38 @@ def test_snapshot_documents_rejects_a_capture_that_is_not_a_pdf(
 
 
 @respx.mock
+def test_a_capture_that_was_cut_short_is_recorded_and_the_run_goes_on(
+    connection: duckdb.DuckDBPyConnection,
+    registry: Registry,
+    settings: Settings,
+    fetcher: Fetcher,
+    build_pdf: PdfBuilder,
+) -> None:
+    """The archive holds captures that start as a PDF and stop partway."""
+    _record_pricing_candidate(connection)
+    later = PRICING_PDF.replace("2022-2023", "2023-2024")
+    source.record_candidate(
+        connection, Candidate(later, "toyota_media", source.PRICING_PDF, (2023, 2024), "page")
+    )
+    whole = build_pdf([["Pricing"]])
+    respx.get(AVAILABILITY).mock(return_value=_availability("20221224052141"))
+    respx.get(CAPTURE).mock(return_value=httpx.Response(200, content=whole[:60]))
+    respx.get(CAPTURE.replace("2022-2023", "2023-2024")).mock(
+        return_value=httpx.Response(200, content=whole)
+    )
+
+    report = snapshot.snapshot_documents(connection, registry, settings, fetcher)
+
+    assert report.unavailable == [PRICING_PDF]
+    assert report.fetched == [later]
+    failed = source.find_candidate(connection, PRICING_PDF)
+    assert failed is not None
+    assert failed.detail.startswith("the file is not a readable PDF")
+    assert [held.url for held in snapshot.list_snapshots(connection, settings)] == [later]
+    assert len(list(settings.snapshot_dir.glob("*.pdf"))) == 1
+
+
+@respx.mock
 def test_snapshot_documents_asks_again_only_when_told_to(
     connection: duckdb.DuckDBPyConnection,
     registry: Registry,
@@ -241,3 +273,55 @@ def test_snapshot_documents_fetches_a_direct_source_directly(
     failed = source.find_candidate(connection, address)
     assert failed is not None
     assert failed.detail == "HTTP 500"
+
+
+def test_rederive_snapshots_rebuilds_what_is_derived_from_the_stored_bytes(
+    connection: duckdb.DuckDBPyConnection, settings: Settings, build_pdf: PdfBuilder
+) -> None:
+    table = [["MODEL #", "MSRP"], ["9101", "$28,495"]]
+    stored = snapshot.store_snapshot(
+        connection,
+        settings,
+        url=PRICING_PDF,
+        source_id="toyota_media",
+        kind=source.PRICING_PDF,
+        raw=build_pdf(table=table),
+        media_type="application/pdf",
+        fetch_url=CAPTURE,
+        route=snapshot.WAYBACK,
+    )
+    derived = stored.read_tables()
+    stored.tables_path.write_text("[]", encoding="utf-8")
+    stored.text_path.write_text("stale", encoding="utf-8")
+
+    assert snapshot.rederive_snapshots(connection, settings) == 1
+
+    assert stored.read_tables() == derived
+    assert "$28,495" in stored.read_text()
+
+
+def test_two_addresses_that_serve_the_same_bytes_are_both_kept(
+    connection: duckdb.DuckDBPyConnection, settings: Settings
+) -> None:
+    """Toyota links one pricing PDF at two addresses. Both are documents; the bytes are one."""
+    raw = b"<p>The same bytes at two addresses.</p>"
+    copy = f"{RELEASE}copy/"
+    stored = [
+        snapshot.store_snapshot(
+            connection,
+            settings,
+            url=url,
+            source_id="toyota_pressroom",
+            kind="release",
+            raw=raw,
+            media_type="text/html",
+            fetch_url=url,
+            route=snapshot.DIRECT,
+        )
+        for url in (RELEASE, copy)
+    ]
+    assert stored[0].sha256 == stored[1].sha256
+    assert stored[0].raw_path == stored[1].raw_path
+    held = snapshot.list_snapshots(connection, settings)
+    assert sorted(found.url for found in held) == [RELEASE, copy]
+    assert snapshot.find_snapshot(connection, settings, copy) == stored[1]
