@@ -55,6 +55,11 @@ PRICES_PER_MILLION_TOKENS = {
     "claude-haiku-5-5": (0.1, 0.5),
 }
 MAX_OUTPUT_TOKENS = 64000
+# Models that take the server-side refusal fallback in its `default` form. A
+# Haiku has none, so a refusal there leaves the document failed.
+FALLBACK_MODELS = frozenset(
+    {"claude-fable-5-1", "claude-opus-5-5", "claude-opus-5", "claude-sonnet-5-5"}
+)
 
 _DOLLAR_AMOUNT_PATTERN = re.compile(r"\$\s?\d")
 
@@ -242,25 +247,31 @@ class AnthropicExtractor:
         model: str,
         effort: Literal["low", "medium", "high", "xhigh", "max"],
         *,
+        is_thinking: bool = True,
         api_key: str | None = None,
         client: anthropic.Anthropic | None = None,
     ) -> None:
-        self.label = model
+        # An answer read without thinking is kept apart from one read with it.
+        self.label = model if is_thinking else f"{model}/no-thinking"
         self._model = model
         self._effort = effort
+        self._is_thinking = is_thinking
         # With no key given, the SDK resolves ANTHROPIC_API_KEY from the
         # environment or an `ant auth login` profile.
         self._client = client or anthropic.Anthropic(api_key=api_key)
 
     def extract(self, request: ExtractionRequest) -> ExtractorResponse:
         # Streamed, because a pricing document's answer runs to hundreds of
-        # rows. A request a safety classifier declines is re-run server-side
-        # on the model Anthropic recommends for that refusal category.
+        # rows. Where the model allows it, a request a safety classifier
+        # declines is re-run server-side on the model Anthropic recommends for
+        # that refusal category.
+        has_fallback = self._model in FALLBACK_MODELS
         with self._client.beta.messages.stream(
             model=self._model,
             max_tokens=MAX_OUTPUT_TOKENS,
-            betas=["server-side-fallback-2026-07-01"],
-            fallbacks="default",
+            betas=["server-side-fallback-2026-07-01"] if has_fallback else anthropic.omit,
+            fallbacks="default" if has_fallback else anthropic.omit,
+            thinking={"type": "adaptive"} if self._is_thinking else {"type": "disabled"},
             system=request.system,
             messages=[{"role": "user", "content": request.document}],
             output_config={
