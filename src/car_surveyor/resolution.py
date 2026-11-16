@@ -36,7 +36,7 @@ import duckdb
 
 from car_surveyor import claim, storage
 from car_surveyor.claim import StyleClaim, ValueClaim
-from car_surveyor.evidence import FileRow
+from car_surveyor.evidence import FileRow, TableCell
 from car_surveyor.verification import UNITS_BY_ATTRIBUTE
 
 VIEWS_PATH = Path(__file__).resolve().parents[2] / "sql" / "views.sql"
@@ -77,6 +77,19 @@ _SECTION_WORDS = frozenset({"engine", "electric", "motor", "hybrid", "power", "s
 # Words that make a different vehicle line when added to a model's name. A
 # document about the Corolla says nothing about the Corolla Cross.
 _LINE_WORDS = frozenset({"hybrid", "prime", "hatchback", "cross", "gr", "crown", "max"})
+# Words that name a powertrain where a document sets one against another:
+# `Gas` beside `Hybrid`, or `HYBRID` beside `HYBRID MAX`.
+_POWERTRAIN_WORDS = {
+    "gas": "gas",
+    "gasoline": "gas",
+    "hybrid": "hybrid",
+    "hv": "hybrid",
+    "max": "max",
+}
+# What separates the grades in a column header such as `L, LE, XLE`.
+_LIST_PATTERN = re.compile(r",|/|&|\band\b", re.IGNORECASE)
+# A grade marked as the hybrid one: `LE HV`, `XLE Hybrid`.
+_HYBRID_GRADE_PATTERN = re.compile(r"\b(?:hv|hybrid)\b", re.IGNORECASE)
 # Words in a grade list that mean a span of grades, which cannot be expanded
 # without knowing the grade order.
 _RANGE_PATTERN = re.compile(r"→|>|\bthrough\b|\bthru\b|\bto\b|\+")
@@ -134,6 +147,14 @@ class Style:
     def is_electrified(self) -> bool:
         words = set(list_words(f"{self.powertrain or ''} {self.engine or ''}"))
         return bool(words & {"hybrid", "prime", "max"})
+
+    @property
+    def powertrain_words(self) -> frozenset[str]:
+        """`gas`, or `hybrid`, with `max` for the stronger of a line's two hybrids."""
+        if not self.is_electrified:
+            return frozenset({"gas"})
+        words = set(list_words(f"{self.powertrain or ''} {self.engine or ''}"))
+        return frozenset({"hybrid"} | (words & {"max"}))
 
 
 @dataclass(frozen=True, slots=True)
@@ -432,6 +453,13 @@ def match_scope(style: Style, scope: dict[str, Any]) -> tuple[int, str] | None:
                 return None
             specificity += 2
 
+    # Set by `read_document_scopes` where the document tells powertrains apart.
+    stated_powertrain = scope.get("powertrain")
+    if stated_powertrain:
+        if frozenset(stated_powertrain) != style.powertrain_words:
+            return None
+        specificity += 2
+
     stated_transmission = get_transmission_class(str(scope.get("transmission") or ""))
     if stated_transmission is not None:
         if style.transmission_class is not None and style.transmission_class != stated_transmission:
@@ -444,6 +472,98 @@ def match_scope(style: Style, scope: dict[str, Any]) -> tuple[int, str] | None:
             return None
         specificity += 1
     return specificity, "; ".join(notes)
+
+
+def read_document_scopes(figures: list[ValueClaim]) -> dict[str, dict[str, Any]]:
+    """The scope of each of a document's figures, with what the document adds to it.
+
+    Two things a document says about a figure are outside the scope the
+    extractor gave it, and each is read only where the document leaves no
+    other way to tell its figures apart.
+
+    Where one row of a table gives a figure in each of several columns and
+    none of them names a grade or an engine, the column headers are what
+    separate them, and a header such as `L, LE, XLE` is a list of grades. The
+    header is the one the evidence check found above the cell.
+
+    Where a document sets `Gas` against `Hybrid`, or `HYBRID` against
+    `HYBRID MAX`, those words name a powertrain and not an engine. The same
+    holds where some of an attribute's figures are for grades marked as
+    hybrids (`LE HV`) and others for grades that are not (`LE`).
+    """
+    scopes = {figure.claim_id: figure.applies_to for figure in figures}
+
+    rows: dict[tuple[str, int, int, str], list[tuple[ValueClaim, str]]] = defaultdict(list)
+    for figure in figures:
+        locator = figure.locator
+        if isinstance(locator, TableCell):
+            key = (figure.attribute, locator.page, locator.table, locator.row_label)
+            rows[key].append((figure, locator.column_header))
+    for cells in rows.values():
+        is_unscoped = not any(
+            figure.applies_to.get("grades") or figure.applies_to.get("engine")
+            for figure, _ in cells
+        )
+        if not is_unscoped or len({header for _, header in cells}) < 2:
+            continue
+        for figure, header in cells:
+            grades = split_grade_header(header)
+            if grades:
+                scopes[figure.claim_id] = {**figure.applies_to, "grades": grades}
+
+    powertrains = {
+        figure.claim_id: get_powertrain(str(figure.applies_to.get("engine") or ""))
+        for figure in figures
+    }
+    if len({words for words in powertrains.values() if words}) > 1:
+        for claim_id, words in powertrains.items():
+            if words:
+                scopes[claim_id] = {**scopes[claim_id], "powertrain": sorted(words)}
+
+    by_attribute: dict[str, list[ValueClaim]] = defaultdict(list)
+    for figure in figures:
+        if scopes[figure.claim_id].get("grades") and "powertrain" not in scopes[figure.claim_id]:
+            by_attribute[figure.attribute].append(figure)
+    for graded in by_attribute.values():
+        marks = {
+            figure.claim_id: [
+                bool(_HYBRID_GRADE_PATTERN.search(str(grade)))
+                for grade in scopes[figure.claim_id]["grades"]
+            ]
+            for figure in graded
+        }
+        if not any(all(marked) for marked in marks.values()) or all(
+            any(marked) for marked in marks.values()
+        ):
+            continue
+        for claim_id, marked in marks.items():
+            scope = scopes[claim_id]
+            if all(marked):
+                grades = [_HYBRID_GRADE_PATTERN.sub(" ", str(grade)) for grade in scope["grades"]]
+                named = [" ".join(grade.split()) for grade in grades if grade.strip()]
+                scopes[claim_id] = {**scope, "grades": named, "powertrain": ["hybrid"]}
+            elif not any(marked):
+                scopes[claim_id] = {**scope, "powertrain": ["gas"]}
+    return scopes
+
+
+def split_grade_header(header: str) -> list[str]:
+    """The grades a column header lists, or none where it is not a list of grades."""
+    pieces = [piece.strip() for piece in _LIST_PATTERN.split(header) if piece.strip()]
+    for piece in pieces:
+        words = [word for word in list_words(piece) if word not in _DRIVE_CLASSES]
+        is_engine = get_cylinders(piece) is not None or any(char.isdigit() for char in piece)
+        if is_engine or not set(words) - _SECTION_WORDS:
+            return []
+    return pieces
+
+
+def get_powertrain(engine: str) -> frozenset[str]:
+    """The powertrain an engine scope names, if it names nothing else: `Gas`, `HYBRID MAX`."""
+    words = list_words(engine)
+    if not words or any(word not in _POWERTRAIN_WORDS for word in words):
+        return frozenset()
+    return frozenset(_POWERTRAIN_WORDS[word] for word in words)
 
 
 def match_document(style: Style, model_year: Any, model: str, is_electrified: bool) -> int | None:
@@ -671,6 +791,7 @@ def _attach_specification(
     for sha256, covered in covering.items():
         if covered != best:
             continue
+        scopes = read_document_scopes(by_snapshot[sha256])
         for figure in by_snapshot[sha256]:
             role = _get_role(figure)
             canonical = _CANONICAL_UNITS.get(figure.attribute)
@@ -679,7 +800,7 @@ def _attach_specification(
             )
             if role == "motor" or (canonical is not None and unit != canonical):
                 continue
-            matched = match_scope(style, figure.applies_to)
+            matched = match_scope(style, scopes[figure.claim_id])
             if matched is None:
                 continue
             specificity, note = matched

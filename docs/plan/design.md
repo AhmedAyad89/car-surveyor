@@ -19,7 +19,8 @@ calls, and leaves every table as it was.
   under their SHA-256, the text derived from them, and each table as a
   table. Toyota's PDFs sit on a host that refuses every client but a
   browser, so each comes from its Wayback capture, or from a file placed
-  by hand in `data/inbox/`.
+  by hand in `data/inbox/`. A capture that was cut short is recorded as
+  unavailable with the reason, and nothing is stored for it.
 - **`extract`** parses `vehicles.csv`, and makes one model call per
   document with structured output. The answer is kept as returned, keyed
   on the snapshot hash and the extractor version, which names the model
@@ -151,6 +152,19 @@ when such a row exists: `Camry LE` beside `Camry LE AWD` is not
 all-wheel drive, `3.0 Base` beside `3.0 Base MT` is the automatic, and
 `SR Access Cab 6AT` beside `SR Access Cab V6 6AT` is not a V6. The drive
 and transmission so inferred are marked as inferred.
+
+Two things are read from the document itself, and only where it leaves
+no other way to tell its figures apart:
+
+- **A column header that lists grades.** Where one row of a table gives
+  a figure in each of several columns and none names a grade or an
+  engine, a header such as `L, LE, XLE` is the list of grades its figure
+  covers. The header is the one the evidence check found above the cell.
+- **Powertrain words.** Where a document sets `Gas` against `Hybrid`,
+  `HYBRID` against `HYBRID MAX`, or grades marked `HV` against grades
+  that are not, each figure is kept to the styles of its powertrain. A
+  lone `Hybrid` is a section title and restricts nothing, because a
+  model sold only as a hybrid is priced without the word.
 
 Per attribute:
 
