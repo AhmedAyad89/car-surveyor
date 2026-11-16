@@ -56,6 +56,9 @@ _DRIVE_CLASSES = {
     "4x4": FOUR_WHEEL,
     "4wd": FOUR_WHEEL,
     "awd": FOUR_WHEEL,
+    # The hybrids' electric all-wheel drive: `AWD-e` on a Prius, `AWD-i` on a Highlander.
+    "awde": FOUR_WHEEL,
+    "awdi": FOUR_WHEEL,
     "allwheeldrive": FOUR_WHEEL,
     "4wheeldrive": FOUR_WHEEL,
     "parttime4wheeldrive": FOUR_WHEEL,
@@ -695,12 +698,12 @@ def get_drive_class(drive: Any) -> str | None:
 
 
 def get_transmission_class(text: str) -> str | None:
-    """Manual or automatic, from designations such as `6MT`, `A91-MT`, `8ECTi`, `6A`, `CVT`."""
+    """Manual or automatic, from designations such as `6MT`, `A91-MT`, `8ECTi`, `6A`, `CVTi-S`."""
     words = _WORD_PATTERN.findall(text.lower())
     if any(word == "manual" or re.fullmatch(r"\d?mt", word) for word in words):
         return MANUAL
     is_automatic = any(
-        word in ("automatic", "cvt", "ecvt") or re.fullmatch(r"\d{1,2}a|\d{0,2}(at|ect|ecti)", word)
+        word == "automatic" or re.fullmatch(r"e?cvti?|\d{1,2}a|\d{0,2}(at|ect|ecti)", word)
         for word in words
     )
     return AUTOMATIC if is_automatic else None
