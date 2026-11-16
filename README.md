@@ -41,6 +41,7 @@ just check
 | `just status` | counts recorded documents by kind and by what became of them |
 | `just diff dev` | **you only, from your own terminal:** compares the styles with OpenSpec |
 | `just reference-coverage` | **you only:** counts what OpenSpec holds per model year |
+| `just view` | serves a local page over the database, the documents and the diff's feedback, for development |
 
 The stage recipes take `--years 2023` to work on some model years only, and
 `--retry-unavailable` to ask again for what an earlier run could not get. A
@@ -76,6 +77,18 @@ only the first, so the held-out years stay unseen until the end.
 
 The command refuses to start inside a Claude Code session. Run it in a plain
 terminal.
+
+## Viewer
+
+`just view` serves a page at `http://127.0.0.1:8765/` (`--port` picks another
+port) with the catalogue, each cell's claims and evidence, the documents, the
+checks and the diff's feedback. It only reads, so the pipeline can run beside
+it, and it shows no OpenSpec value. To view another data directory, set
+`CAR_SURVEYOR_DATA_DIR`.
+
+From your own terminal, `just view --diff-detail ~/refdata/out/<run_id>.json`
+also shows OpenSpec's values beside the pipeline's, at the address with a
+token that it prints. An agent session is refused that argument.
 
 A recipe is added with the code it runs.
 

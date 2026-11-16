@@ -193,6 +193,14 @@ what became of them, and the diff's bucket counts from the feedback
 file. It shows a reference value only when the user starts it with the
 detailed diff output, which no agent session can read.
 
+`just view` runs it (`viewer.py`, and the page in `viewer_assets/`). It
+opens the database read-only for each request and closes it, so a stage
+can run between two clicks, and it loads nothing from the network.
+`--diff-detail` has no default and is refused where `CLAUDECODE` is set.
+The reference values it unlocks are served by one endpoint, and only at
+the address the viewer prints, which carries a token: another process
+that asks the same server sees the page without them.
+
 ## Changes from the plan
 
 - **`powertrain` is a style column.** The pricing documents put Hybrid
