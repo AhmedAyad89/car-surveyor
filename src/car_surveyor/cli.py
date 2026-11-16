@@ -37,7 +37,7 @@ AGENT_REFUSAL = """\
 
 NO_CREDENTIALS = """\
 extract: no Claude API credentials were found, so no document was read.
-  Set ANTHROPIC_API_KEY in .env, or run `ant auth login`, and run this again.
+  Set ANTHROPIC_API_KEY in .env.secret, or run `ant auth login`, and run this again.
   To have another model runner read the documents instead:
     just extract --export data/extraction --label <runner-name>
     (answer each request file, then)

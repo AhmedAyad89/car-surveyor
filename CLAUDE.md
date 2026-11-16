@@ -62,7 +62,7 @@ Casing follows PEP 8; the rules below are about *what kind of word* to use.
 
 - Type hints on every function signature. `ty` must pass.
 - No network calls in tests; mock with `respx`.
-- Secrets come from `.env` via `pydantic-settings`. Never hardcode, never commit.
+- Secrets come from `.env.secret` via `pydantic-settings`. Never hardcode, never commit.
 - Notebooks, if any, go in `notebooks/` in the percent format, which represents notebooks as scripts.
 
 ## Data rules

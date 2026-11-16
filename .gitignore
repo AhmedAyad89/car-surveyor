@@ -32,7 +32,7 @@ htmlcov/
 notebooks/*.ipynb
 .ipynb_checkpoints/
 
-# Secrets — settings come from .env via pydantic-settings, never from git
+# Secrets — settings come from .env.secret via pydantic-settings, never from git
 .env
 .env.*
 !.env.example

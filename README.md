@@ -52,7 +52,7 @@ every held document's text and tables again from its stored bytes, without
 fetching, and `just verify --recheck` checks every claim against the result.
 
 `just extract` calls the Claude API, with the key from `ANTHROPIC_API_KEY` in
-`.env` or an `ant auth login` profile. The model is `claude-opus-5-5` unless
+`.env.secret` or an `ant auth login` profile. The model is `claude-opus-5-5` unless
 `CAR_SURVEYOR_EXTRACTION_MODEL` says otherwise. Without credentials, another
 model runner can read the documents through files:
 
