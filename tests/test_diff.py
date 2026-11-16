@@ -169,12 +169,54 @@ def test_rows_without_a_code_match_by_description() -> None:
         (_style("Example SR5 Access Cab LB", grade="SR5", body="Access Cab LB"), _row("SR5", labels={"cab": "Double Cab"}), False),
         (_style("Example TRD Off-Road", grade="TRD Off-Road"), _row("TRD Off Road"), True),
         (_style("Example LTD", grade="LTD"), _row("Limited"), True),
+        (_style("Example AT", transmission_class="automatic"), _row("Base", transmission_type="automatic"), True),
+        (_style("Example AT", transmission_class="automatic"), _row("Example", transmission_type="automatic"), True),
+        (_style("Example AT", transmission_class="automatic"), _row("Premium", transmission_type="automatic"), False),
+        (_style("Example Nightshade", grade="Nightshade"), _row("Nightshade Edition", labels={"body": "SUV", "tier": "Midsize", "seating_capacity": "5"}), True),
+        (_style("Example Woodland Special Edition", grade="Woodland Special Edition"), _row("Woodland Edition", labels={"body": "SUV"}), True),
+        (_style("Example Bronze Special Edition", grade="Bronze Special Edition"), _row("Woodland Edition"), False),
+        (_style("Example SR5 CrewMax", grade="SR5", body="CrewMax"), _row("SR5", labels={"cab": "CrewMax", "seating_capacity": "5"}), True),
     ],
 )  # fmt: skip
 def test_a_description_matches_only_where_nothing_contradicts(
     style: PipelineStyle, row: ReferenceStyle, is_matched: bool
 ) -> None:
     assert (diff.score_description(style, row) >= diff.MIN_DESCRIPTION_SCORE) is is_matched
+
+
+def test_an_unmarked_style_is_of_unknown_powertrain_where_its_line_names_none() -> None:
+    styles = [_style(f"Example {grade}", grade=grade) for grade in ("LE", "XLE")]
+    rows = [_row(grade, engine_type="hybrid") for grade in ("LE", "XLE")]
+    matches, missed, extra = diff.match_rows(styles, rows)
+    assert {(found.pipeline.grade, found.reference.trim) for found in matches} == {
+        ("LE", "le"),
+        ("XLE", "xle"),
+    }
+    assert (missed, extra) == ([], [])
+
+
+def test_an_unmarked_style_is_gas_where_its_line_names_a_hybrid() -> None:
+    gas = _style("Example LE", grade="LE")
+    hybrid = _style("Example LE Hybrid", grade="LE", powertrain="Hybrid")
+    rows = [_row("LE", engine_type="hybrid", configuration="hybrid")]
+    matches, _, extra = diff.match_rows([gas, hybrid], rows)
+    assert [found.pipeline.description for found in matches] == ["Example LE Hybrid"]
+    assert extra == [gas]
+
+
+def test_an_engine_label_every_style_of_a_line_shares_is_not_checked() -> None:
+    styles = [_style(f"Example {grade} V6", grade=grade, engine="V6") for grade in ("L", "LE")]
+    rows = [_row(grade, cylinders=4) for grade in ("L", "LE")]
+    matches, missed, _ = diff.match_rows(styles, rows)
+    assert (len(matches), missed) == (2, [])
+
+
+def test_an_engine_label_that_tells_styles_apart_is_checked() -> None:
+    four = _style("Example SR", grade="SR")
+    six = _style("Example SR V6", grade="SR", engine="V6")
+    matches, missed, extra = diff.match_rows([four, six], [_row("SR", cylinders=4)])
+    assert [found.pipeline.description for found in matches] == ["Example SR"]
+    assert (missed, extra) == ([], [six])
 
 
 def test_matching_is_the_same_whatever_order_the_rows_come_in() -> None:
