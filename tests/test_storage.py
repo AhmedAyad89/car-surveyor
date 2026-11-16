@@ -1,4 +1,4 @@
-"""Tests for the database file's schema and its one migration."""
+"""Tests for the database file's schema and its migration."""
 
 from __future__ import annotations
 
@@ -27,6 +27,10 @@ KEYED_ON_HASH = """
         document_date DATE
     )
 """
+# The `snapshots` table as it was before one address could hold two captures.
+KEYED_ON_URL = KEYED_ON_HASH.replace("sha256 TEXT PRIMARY KEY", "sha256 TEXT NOT NULL").replace(
+    "url TEXT NOT NULL UNIQUE", "url TEXT PRIMARY KEY"
+)
 INSERT = (
     "INSERT INTO snapshots VALUES (?, 's', ?, ?, 'direct', 'k', 'm', 'r', 't', 'j', ?, NULL, NULL)"
 )
@@ -42,9 +46,9 @@ def _get_key(connection: duckdb.DuckDBPyConnection) -> list[str]:
     return list(found[0])
 
 
-def test_a_new_file_keys_snapshots_on_the_address(tmp_path: Path) -> None:
+def test_a_new_file_keys_snapshots_on_the_address_and_the_hash(tmp_path: Path) -> None:
     connection = storage.connect(tmp_path / "new.duckdb")
-    assert _get_key(connection) == ["url"]
+    assert _get_key(connection) == ["url", "sha256"]
     connection.close()
 
 
@@ -57,7 +61,7 @@ def test_a_file_keyed_on_the_hash_is_rekeyed_and_keeps_its_rows(tmp_path: Path) 
 
     connection = storage.connect(database_path)
 
-    assert _get_key(connection) == ["url"]
+    assert _get_key(connection) == ["url", "sha256"]
     rows = storage.fetch_records(connection, "SELECT sha256, url, fetch_url FROM snapshots")
     assert rows == [
         {"sha256": "hash-1", "url": "https://example.test/a.pdf", "fetch_url": "fetch-a"}
@@ -74,5 +78,21 @@ def test_opening_a_file_twice_rekeys_it_only_once(tmp_path: Path) -> None:
     first.close()
     second = storage.connect(database_path)
     assert second.execute("SELECT count(*) FROM snapshots").fetchone() == (1,)
-    assert _get_key(second) == ["url"]
+    assert _get_key(second) == ["url", "sha256"]
     second.close()
+
+
+def test_a_file_keyed_on_the_address_is_rekeyed_to_hold_two_captures(tmp_path: Path) -> None:
+    database_path = tmp_path / "by-url.duckdb"
+    old = duckdb.connect(str(database_path))
+    old.execute(KEYED_ON_URL)
+    old.execute(INSERT, ["hash-1", "https://example.test/a.pdf", "capture-1", FETCHED_AT])
+    old.close()
+
+    connection = storage.connect(database_path)
+
+    assert _get_key(connection) == ["url", "sha256"]
+    connection.execute(INSERT, ["hash-2", "https://example.test/a.pdf", "capture-2", FETCHED_AT])
+    rows = storage.fetch_records(connection, "SELECT sha256 FROM snapshots ORDER BY sha256")
+    assert rows == [{"sha256": "hash-1"}, {"sha256": "hash-2"}]
+    connection.close()

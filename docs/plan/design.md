@@ -20,7 +20,10 @@ calls, and leaves every table as it was.
   table. Toyota's PDFs sit on a host that refuses every client but a
   browser, so each comes from its Wayback capture, or from a file placed
   by hand in `data/inbox/`. A capture that was cut short is recorded as
-  unavailable with the reason, and nothing is stored for it.
+  unavailable with the reason, and nothing is stored for it. Toyota
+  updates price sheets in place, so `snapshot --every-capture` also keeps
+  each distinct archived capture of a held price sheet, each with its own
+  capture date ([probe](../findings/2026-11-16-wayback-captures.md)).
 - **`extract`** parses `vehicles.csv`, and makes one model call per
   document with structured output. The answer is kept as returned, keyed
   on the snapshot hash and the extractor version, which names the model

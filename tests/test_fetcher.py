@@ -64,6 +64,7 @@ def test_check_address_refuses_the_media_host_that_refuses_this_client(registry:
         f"https://web.archive.org/web/2022/{PRICING_PDF.removeprefix('https://')}",
         "https://archive.org/wayback/available?url=https%3A%2F%2Fpressroom.toyota.com%2Fx%2F",
         "https://web.archive.org/web/2022/https://s3.amazonaws.com/toyota-cms-media/a.pdf",
+        f"https://web.archive.org/cdx/search/cdx?url={PRICING_PDF.removeprefix('https://')}",
     ],
 )
 def test_check_address_accepts_an_archived_toyota_address(registry: Registry, url: str) -> None:
@@ -78,6 +79,7 @@ def test_check_address_accepts_an_archived_toyota_address(registry: Registry, ur
         "https://web.archive.org/web/2026/https%3A%2F%2Fopenspec.visor.vin%2F",
         "https://archive.org/wayback/available?url=openspec.visor.vin",
         "https://archive.org/wayback/available?url=https%3A%2F%2Fvisor.vin%2F",
+        "https://web.archive.org/cdx/search/cdx?url=openspec.visor.vin/data",
     ],
 )
 def test_check_address_refuses_an_archived_copy_of_the_reference(
@@ -91,7 +93,8 @@ def test_check_address_refuses_an_archived_copy_of_the_reference(
     "url",
     [
         "https://web.archive.org/web/2026/https://example.com/prices",
-        "https://web.archive.org/cdx/search/cdx?url=pressroom.toyota.com",
+        "https://web.archive.org/cdx/search/cdx?url=example.com/prices.pdf",
+        "https://web.archive.org/cdx/search/cdx?matchType=domain",
         "https://web.archive.org/",
         f"https://web.archive.org/web/2026/https://web.archive.org/web/2026/{PRICING_PDF}",
     ],
