@@ -201,7 +201,7 @@ def snapshot_documents(
             problem = _snapshot_candidate(
                 connection, registry, settings, fetcher, candidate, is_asking_network
             )
-        except (LookupError, httpx.HTTPError) as error:
+        except (LookupError, httpx.HTTPError, document.UnreadableDocumentError) as error:
             problem = str(error) or type(error).__name__
         if problem is None:
             source.mark_candidate(connection, candidate.url, "fetched")

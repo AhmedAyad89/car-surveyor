@@ -204,6 +204,38 @@ def test_snapshot_documents_rejects_a_capture_that_is_not_a_pdf(
 
 
 @respx.mock
+def test_a_capture_that_was_cut_short_is_recorded_and_the_run_goes_on(
+    connection: duckdb.DuckDBPyConnection,
+    registry: Registry,
+    settings: Settings,
+    fetcher: Fetcher,
+    build_pdf: PdfBuilder,
+) -> None:
+    """The archive holds captures that start as a PDF and stop partway."""
+    _record_pricing_candidate(connection)
+    later = PRICING_PDF.replace("2022-2023", "2023-2024")
+    source.record_candidate(
+        connection, Candidate(later, "toyota_media", source.PRICING_PDF, (2023, 2024), "page")
+    )
+    whole = build_pdf([["Pricing"]])
+    respx.get(AVAILABILITY).mock(return_value=_availability("20221224052141"))
+    respx.get(CAPTURE).mock(return_value=httpx.Response(200, content=whole[:60]))
+    respx.get(CAPTURE.replace("2022-2023", "2023-2024")).mock(
+        return_value=httpx.Response(200, content=whole)
+    )
+
+    report = snapshot.snapshot_documents(connection, registry, settings, fetcher)
+
+    assert report.unavailable == [PRICING_PDF]
+    assert report.fetched == [later]
+    failed = source.find_candidate(connection, PRICING_PDF)
+    assert failed is not None
+    assert failed.detail.startswith("the file is not a readable PDF")
+    assert [held.url for held in snapshot.list_snapshots(connection, settings)] == [later]
+    assert len(list(settings.snapshot_dir.glob("*.pdf"))) == 1
+
+
+@respx.mock
 def test_snapshot_documents_asks_again_only_when_told_to(
     connection: duckdb.DuckDBPyConnection,
     registry: Registry,

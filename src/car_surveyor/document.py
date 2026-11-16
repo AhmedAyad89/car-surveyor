@@ -16,6 +16,8 @@ from html.parser import HTMLParser
 from itertools import pairwise
 
 import pdfplumber
+from pdfminer.psexceptions import PSException
+from pdfplumber.utils.exceptions import PdfminerException
 
 PDF = "application/pdf"
 HTML = "text/html"
@@ -34,6 +36,10 @@ _BLOCK_TAGS = frozenset(
     {"p", "div", "br", "li", "tr", "h1", "h2", "h3", "h4", "h5", "h6", "table", "section", "ul"}
 )
 _SKIPPED_TAGS = frozenset({"script", "style", "noscript", "template"})
+
+
+class UnreadableDocumentError(ValueError):
+    """Raised when a file's bytes are not the kind of document they claim to be."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -74,6 +80,14 @@ def derive_document(raw: bytes, media_type: str) -> DerivedDocument:
 
 
 def derive_pdf(raw: bytes) -> DerivedDocument:
+    """Derive a PDF's text and tables. An archive can hold a capture that was cut short."""
+    try:
+        return _read_pdf(raw)
+    except (PdfminerException, PSException) as error:
+        raise UnreadableDocumentError(f"the file is not a readable PDF ({error})") from error
+
+
+def _read_pdf(raw: bytes) -> DerivedDocument:
     page_texts: list[str] = []
     tables: list[Table] = []
     # The column boundaries of the last table that had columns of its own.
@@ -158,11 +172,16 @@ def _has_same_edges(boundaries: list[float], other: list[float]) -> bool:
 
 def read_zip_member(raw: bytes) -> str:
     """The text of the one file an archive holds."""
-    with zipfile.ZipFile(io.BytesIO(raw)) as archive:
-        names = archive.namelist()
-        if len(names) != 1:
-            raise ValueError(f"expected an archive of one file, found {len(names)}")
-        return decode_text(archive.read(names[0]))
+    try:
+        with zipfile.ZipFile(io.BytesIO(raw)) as archive:
+            names = archive.namelist()
+            if len(names) != 1:
+                raise UnreadableDocumentError(
+                    f"expected an archive of one file, found {len(names)}"
+                )
+            return decode_text(archive.read(names[0]))
+    except zipfile.BadZipFile as error:
+        raise UnreadableDocumentError(f"the file is not a readable archive ({error})") from error
 
 
 def decode_text(raw: bytes) -> str:

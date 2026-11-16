@@ -125,6 +125,15 @@ def test_derive_document_reads_the_file_inside_an_archive() -> None:
     assert derived.text.splitlines()[1] == "1,Toyota,Example"
 
 
+def test_a_file_cut_short_is_unreadable_not_a_crash(build_pdf: PdfBuilder) -> None:
+    whole = build_pdf([["2023 Example LE"]])
+    with pytest.raises(document.UnreadableDocumentError, match="not a readable PDF"):
+        document.derive_document(whole[:60], document.PDF)
+    with pytest.raises(document.UnreadableDocumentError, match="not a readable archive"):
+        document.derive_document(b"PK\x03\x04 cut short", document.ZIP)
+    assert document.derive_document(whole, document.PDF).text == "2023 Example LE"
+
+
 def test_tables_survive_serialization() -> None:
     tables = (Table(2, 1, (("MODEL #", "MSRP"), ("9101", "$28,495"))),)
     assert document.parse_tables(document.serialize_tables(tables)) == tables
