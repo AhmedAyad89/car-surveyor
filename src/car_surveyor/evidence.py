@@ -201,8 +201,8 @@ def find_cell(tables: Sequence[Table], locator: TableCell) -> FoundCell | str:
     The header is the table's first row. A table continued from an earlier
     page has no header of its own, so the header is then taken from the
     nearest earlier table with the same number of columns. The row label must
-    equal one cell of exactly one row: a label that fits two rows names
-    neither.
+    equal one cell of exactly one row: a label that fits two different rows
+    names neither. Two rows that are identical in every cell count as one.
     """
     position = next(
         (
@@ -238,7 +238,9 @@ def find_cell(tables: Sequence[Table], locator: TableCell) -> FoundCell | str:
     ]
     if not matches:
         return f"no row is labelled {locator.row_label!r}"
-    if len(matches) > 1:
+    # A document can print one row twice. Rows that are the same in every
+    # cell say one thing, so the label still names it.
+    if len({row for _, row in matches}) > 1:
         return f"{len(matches)} rows are labelled {locator.row_label!r}"
     row_index, row = matches[0]
     return FoundCell(row[column_index], row, header, row_index, column_index)

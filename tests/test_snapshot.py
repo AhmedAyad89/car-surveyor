@@ -241,3 +241,30 @@ def test_snapshot_documents_fetches_a_direct_source_directly(
     failed = source.find_candidate(connection, address)
     assert failed is not None
     assert failed.detail == "HTTP 500"
+
+
+def test_two_addresses_that_serve_the_same_bytes_are_both_kept(
+    connection: duckdb.DuckDBPyConnection, settings: Settings
+) -> None:
+    """Toyota links one pricing PDF at two addresses. Both are documents; the bytes are one."""
+    raw = b"<p>The same bytes at two addresses.</p>"
+    copy = f"{RELEASE}copy/"
+    stored = [
+        snapshot.store_snapshot(
+            connection,
+            settings,
+            url=url,
+            source_id="toyota_pressroom",
+            kind="release",
+            raw=raw,
+            media_type="text/html",
+            fetch_url=url,
+            route=snapshot.DIRECT,
+        )
+        for url in (RELEASE, copy)
+    ]
+    assert stored[0].sha256 == stored[1].sha256
+    assert stored[0].raw_path == stored[1].raw_path
+    held = snapshot.list_snapshots(connection, settings)
+    assert sorted(found.url for found in held) == [RELEASE, copy]
+    assert snapshot.find_snapshot(connection, settings, copy) == stored[1]

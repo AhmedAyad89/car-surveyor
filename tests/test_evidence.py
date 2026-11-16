@@ -224,6 +224,19 @@ def test_find_cell_refuses_a_label_that_fits_two_rows() -> None:
     assert found.text == "$38,400"
 
 
+def test_find_cell_takes_a_row_the_document_printed_twice() -> None:
+    """Identical rows say one thing, so their shared label is not ambiguous."""
+    row = ("9101", "2023", "Example LE", "$28,495")
+    twice = (Table(1, 0, (("MODEL #", "MY", "MODEL", "MSRP"), row, row)),)
+    found = evidence.find_cell(twice, TableCell(1, 0, "Example LE", "MSRP"))
+    assert isinstance(found, FoundCell)
+    assert (found.text, found.row_index) == ("$28,495", 1)
+
+    repriced = (Table(1, 0, (twice[0].rows[0], row, (*row[:3], "$28,995"))),)
+    by_code = TableCell(1, 0, "9101", "MSRP")
+    assert evidence.find_cell(repriced, by_code) == "2 rows are labelled '9101'"
+
+
 @pytest.mark.parametrize(
     ("locator", "reason"),
     [
