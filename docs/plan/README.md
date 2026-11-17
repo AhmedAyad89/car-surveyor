@@ -116,6 +116,7 @@ detected problems, an MCP server, sales data, other markets.
 
 | File | Holds |
 |---|---|
+| [../pipeline.md](../pipeline.md) | the pipeline as built, step by step, and where Toyota is built in |
 | [bootstrap.md](bootstrap.md) | creating the repository: what to copy, tooling, layout, the S0 checklist |
 | [isolation.md](isolation.md) | rules for agents, enforcement, the feedback contract |
 | [sources.md](sources.md) | what is known about OpenSpec and about each source |
