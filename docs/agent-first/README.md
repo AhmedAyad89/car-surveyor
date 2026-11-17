@@ -44,13 +44,20 @@ full schema is designed in a separate session (see [Open](#open)).
 
 ## Principles
 
-1. **Code drives the loop; an agent does one unit.** The orchestrator is
-   plain code. It decides what is pending, starts one headless agent per
-   unit of work, and checks what comes back. No agent iterates over a
-   list of documents, retries a fetch, or decides what runs next.
+1. **Agents decide what to do; code does it, as often as needed. The
+   hand-off is a file.** Deciding what the list of work is (which
+   sources, which years, which documents are worth reading, what to do
+   when a class of fetches fails) is judgment, and rare. Working through
+   the list is mechanical, and happens N times. A planner agent writes a
+   declarative work plan; code executes it
+   ([Planning and execution](#planning-and-execution)). No agent
+   iterates over a list it was given, retries a fetch, or keeps
+   bookkeeping.
 2. **Agents where judgment is needed, code everywhere else.** Agents
-   survey, probe, score, read documents and adjudicate. Fetching,
-   storing, converting, checking and counting are code.
+   plan, survey, probe, score, read documents and adjudicate. Fetching,
+   storing, converting, checking and counting are code. Every agent
+   writes data (a source card, a work plan, claims), never actions for
+   code to replay.
 3. **Promote what repeats.** A step an agent does by hand twice, with no
    judgment in it, becomes a tool, an adapter or a skill
    ([Promotion](#promotion)).
@@ -72,18 +79,67 @@ full schema is designed in a separate session (see [Open](#open)).
 | Skills | `SKILL.md` files the agents load | know-how: procedures, and notes on each site |
 | Toolbox | a Python package and its CLI, `cs` | mechanical steps: fetch, store, convert, record, verify |
 | Adapters | per-site code in the toolbox | mechanical steps that only make sense for one site |
-| Orchestrator | plain code | the loop, the queue of units, budgets, the run ledger |
-| Store | a database plus content-addressed files | sources, snapshots, claims, verdicts, runs |
+| Planner | a headless agent, run per make and market | the work plan, and the response to exceptions |
+| Executor | plain code | runs the work plan: the loop, the queue of units, budgets, the run ledger, the outcome digest |
+| Store | a database plus content-addressed files | sources, plans, snapshots, claims, verdicts, runs |
 
 Agents are Claude Code, run headless (`claude -p` with `stream-json`
 output, or the Claude Agent SDK; the choice is a probe in step A0).
 Interactive sessions are for developing the system, not for producing
 data.
 
+## Planning and execution
+
+```mermaid
+flowchart TD
+    P[Planner agent<br/>writes a work plan] --> E[Executor, code<br/>runs the plan N times]
+    E --> T[Adapters and tools<br/>fetch, convert, store]
+    E --> R[Read agents<br/>one per document]
+    E --> J[Jev<br/>one per claim]
+    T --> D[Outcome digest<br/>counts, failures, surprises]
+    R --> D
+    J --> D
+    D -. only on exceptions .-> P
+```
+
+**The planner** is an agent. It reads the approved source cards for a
+make and market, and the last digest if there is one, and writes a
+**work plan**: a file listing the sources to use, the years, the listing
+pages and the adapter for each, which document kinds to read and which
+to skip, and the budget. It does not fetch in a loop or read documents.
+
+**The executor** is code. It validates the plan, expands it into units,
+runs them (adapters and tools directly, read agents one per document,
+Jev one per claim), and writes the run ledger.
+
+**The outcome digest** is code's summary of a run, not its raw results:
+counts per source and unit, failures grouped by cause (nine 403s from
+one host), documents a read skill did not expect, and Jev's escalation
+rate. The planner is called again only when the digest shows something
+outside the plan's expectations. Its context therefore stays small
+however many documents there are.
+
+Work plans are files, so they are reviewed like source cards, compared
+with last month's, and re-run without an agent.
+
+**Fan-out inside an agent** is allowed when choosing the branches is the
+judgment: a survey agent may start Claude Code subagents to look at a
+make's newsroom, its government data and the archives. Fan-out over a
+list that already exists (the 200 documents a plan names) is the
+executor's.
+
+**Why not an orchestrator agent.** An agent that calls a subagent per
+document reads every result into its context and re-reads it on every
+turn. Its cost grows faster than the number of documents, it waits on a
+model turn for each step, and long lists are where agents drift or skip
+items. A loop in code costs no tokens. Its one weakness, a plan fixed in
+code, is what the planner removes.
+
 ## Units of work
 
 | Unit | Granularity | Done by | Produces |
 |---|---|---|---|
+| Plan | per make and market, and on exceptions | planner agent | a work plan |
 | Survey | per make and market | agent | source cards |
 | Probe | per source | agent, then adapter once one exists | probe results on the card: fields, years, access route, layout, counts |
 | Score | per source | agent, plus measured agreement from code | a score and its reasons on the card |
@@ -93,9 +149,9 @@ data.
 | Adjudicate | per contested value | agent | a decision with reasons |
 | Assemble | per make, market and year | code | the catalogue views |
 
-Survey, probe and score are rare: once per make and market, redone when
-a site changes. Read is the one unit that scales with the data, and it
-is the one that needs an agent.
+Plan, survey, probe and score are rare: once per make and market, redone
+when a site changes or a digest shows an exception. Read is the one
+agent unit that scales with the data.
 
 ## Sources
 
@@ -195,7 +251,12 @@ that are structured data already.
    repeated command patterns across runs (the same fetch-and-convert
    pipeline, the same listing page fetched every run).
 
-Both feed the **promotion queue**: candidates with their evidence, how
+3. **Plans and digests.** A planner that writes the same plan for a
+   source every time shows that the plan belongs in the adapter as its
+   default. A digest that shows the same exception run after run shows
+   an adapter or skill to repair.
+
+All three feed the **promotion queue**: candidates with their evidence, how
 often they happened, what they cost, and in which runs.
 
 ### Who promotes
@@ -214,14 +275,14 @@ becomes a skill, never code.
 ### Agents are the fallback
 
 When an adapter fails, because a site changed or a document is new, the
-orchestrator gives that unit to an agent together with the adapter's
+executor gives that unit to an agent together with the adapter's
 error. The agent finishes the unit by hand and logs the failure as
 friction; the toolsmith repairs the adapter. The pipeline slows down
 instead of stopping.
 
 ### Making sure agents use what exists
 
-- A source card names its adapter and skills, and the orchestrator puts
+- A source card names its adapter and skills, and the executor puts
   them in the agent's prompt.
 - `cs tools` lists the toolbox, and the workers' instructions say to
   check it before doing anything by hand.
@@ -284,8 +345,8 @@ Set up in step A0, before any agent runs, and tested before every batch.
 |---|---|---|
 | A0 | repository, isolation, toolbox core (`cs fetch`, store, `cs claim add`), probes of Jev and of the headless runner | `isolation-test` passes; Jev and the runner each have a probe with a yes or no and figures |
 | A1 | survey, probe and score agents; source cards for the first make | every source used has an approved card |
-| A2 | read agents and the verification ladder on one model year; the run ledger | every value traces to a document; Jev's rate of passing bad claims is measured |
-| A3 | friction logs, transcript mining, the promotion queue, the first toolsmith pass | a second run of the same slice costs less than the first |
+| A2 | the planner, the executor and the outcome digest; read agents and the verification ladder on one model year; the run ledger | every value traces to a document; Jev's rate of passing bad claims is measured |
+| A3 | friction logs, transcript mining, plan and digest comparison, the promotion queue, the first toolsmith pass | a second run of the same slice costs less than the first |
 | A4 | a second make and market | its cost per document is below the first make's |
 
 ## Open
@@ -296,4 +357,4 @@ Set up in step A0, before any agent runs, and tested before every batch.
 3. **Runner.** `claude -p` or the Claude Agent SDK, chosen in A0.
 4. **Repository name** and package name.
 5. **Budgets.** A spend cap per unit and per batch, enforced by the
-   orchestrator.
+   executor.
